@@ -31,16 +31,6 @@ void r_init(int w, int h) {
   clip_rect = mu_rect(0, 0, window.width, window.height);
 }
 
-// TODO: remove unused
-// static inline bool within(int c, int lo, int hi) {
-//   return c >= lo && c < hi;
-// }
-
-// static inline bool within_rect(mu_Rect rect, int x, int y) {
-//   return within(x, rect.x, rect.x+rect.w)
-//         && within(y, rect.y, rect.y+rect.h);
-// }
-
 static inline bool same_size(const mu_Rect* a, const mu_Rect* b) {
   return a->w == b->w && a->h == b->h;
 }
@@ -171,15 +161,15 @@ int r_get_text_height(void) {
 void r_set_clip_rect(mu_Rect rect) {
   flush();
   int ystart = mu_max(0, rect.y);
-  int yend = mu_min(window.height, rect.y+rect.h);
+  int yend = mu_min((int)window.height, rect.y+rect.h);
   int xstart = mu_max(0, rect.x);
-  int xend = mu_min(window.width, rect.x+rect.w);
+  int xend = mu_min((int)window.width, rect.x+rect.w);
   clip_rect = mu_rect(xstart, ystart, xend-xstart, yend-ystart);
 }
 
 void r_clear(mu_Color clr) {
   flush();
-  for (int i = 0; i < window.width * window.height; i++) {
+  for (size_t i = 0; i < window.width * window.height; i++) {
     window.buf[i] = r_color(clr);
   }
 }

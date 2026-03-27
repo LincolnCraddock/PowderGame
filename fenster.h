@@ -9,6 +9,7 @@
 #include <CoreGraphics/CoreGraphics.h>
 #include <objc/NSObjCRuntime.h>
 #include <objc/objc-runtime.h>
+#include <stdio.h>
 #elif defined(_WIN32)
 #define FENSTER_WIN
 #include <windows.h>
@@ -51,13 +52,13 @@ struct fenster_input_data {
 
 struct fenster {
 	const char* title;
-	int width;
-	int height;
+	uint32_t width;
+	uint32_t height;
 	uint32_t* buf;
 	struct fenster_input_data inp;
 	uint8_t allow_resize;
-	int win_width;
-	int win_height;
+	uint32_t win_width;
+	uint32_t win_height;
 	float scale_x;
 	float scale_y;
 	int64_t last_sync;   // last sync time
@@ -98,7 +99,7 @@ FENSTER_API void fenster_cursor(struct fenster* f, const int type);
 #ifdef FENSTER_STRETCH
 static void fenster_stretch(struct fenster* f) {
 	float yc = 0.f;
-	int y, x;
+	uint32_t y, x;
 	memset(f->win_buf, 0xff, f->win_width * f->win_height * sizeof(uint32_t));
 	for (y = 0; y < f->win_height; y++) {
 		uint32_t* p_src = &f->buf[(int)yc * f->width];
@@ -293,8 +294,12 @@ FENSTER_API int fenster_loop(struct fenster* f) {
 			CGRect content = msg(CGRect, msg(id, f->wnd, "contentView"), "frame");
 			float x = screen_xy.x - frame.origin.x;
 			float y = screen_xy.y - frame.origin.y;
-			f->inp.mouse_pos[0] = (uint32_t)(x * f->scale_x);
-			f->inp.mouse_pos[1] = (uint32_t)((content.size.height - y) * f->scale_y);
+			float mx = x * f->scale_x;
+			float my = (content.size.height - y) * f->scale_y;
+			if (mx > (float)(f->width  - 1)) f->inp.mouse_pos[0] = (uint32_t)(f->width  - 1);
+			else f->inp.mouse_pos[0] = (uint32_t)mx;
+			if (my > (float)(f->height - 1)) f->inp.mouse_pos[1] = (uint32_t)(f->height - 1);
+			else f->inp.mouse_pos[1] = (uint32_t)my;
 			return 0;
 		}
 	case 10: /*NSEventTypeKeyDown*/

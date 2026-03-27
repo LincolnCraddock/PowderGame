@@ -10,10 +10,23 @@ extern "C" {
 #include <stdlib.h>
 #include <ranges>
 #include <vector>
+#include <map>
+#include <iostream> //debug
 
 
 enum PowderType {
-  EMPTY, DIRT, STONE, WATER, PORTAL
+  EMPTY, DIRT, STONE
+};
+
+std::map<PowderType, std::string> powderNames {
+  {EMPTY, "Eraser"},
+  {DIRT, "Dirt"},
+  {STONE, "Stone"},
+};
+
+struct Data {
+  // only computed for stone
+  uint32_t dy = 0;
 };
 
 
@@ -22,7 +35,8 @@ enum PowderType {
 
 
 static float bg[3] = { 0, 0, 0 };
-static std::vector<std::vector<PowderType>> world (H, std::vector<PowderType>(W));
+static std::vector<std::vector<PowderType>> world (H, std::vector<PowderType>(W, EMPTY));
+static std::vector<std::vector<Data>> worldData (H, std::vector<Data>(W, Data{}));
 
 
 static int uint8_slider(mu_Context *ctx, unsigned char *value, int low, int high) {
@@ -38,16 +52,24 @@ static int uint8_slider(mu_Context *ctx, unsigned char *value, int low, int high
 static void tool_window(mu_Context *ctx, uint8_t *brush_size, PowderType *powder)
 {
   if (mu_begin_window(ctx, "Tools", mu_rect(0, 1, W, 200), 0)) {
-    int sw = mu_get_current_container(ctx)->body.w * 0.14;
-    int widths[] { 80, sw, sw, sw, sw, sw, sw, -1 };
-    mu_layout_row(ctx, 7, widths, 0);
+    int sw = mu_get_current_container(ctx)->body.w - 80 - 20;
+    int widths1[] { 80, sw, -1 };
+    mu_layout_row(ctx, 2, widths1, 0);
     mu_label(ctx, "Brush Size");
-    uint8_slider(ctx, brush_size, 0, 255);
+    uint8_slider(ctx, brush_size, 1, 100);
+    int bw = (sw + 4) / powderNames.size() - 4;
+    // int widths2[] { 80, bw, bw, bw, bw, -1 };
+    std::vector<int> widths3(powderNames.size() + 2, bw);
+    widths3[0] = 80;
+    widths3[1] += (sw + 4) % powderNames.size();
+    widths3.back() = -1;
+    mu_layout_row(ctx, powderNames.size() + 1, widths3.data(), 0);
     mu_label(ctx, "Powder:");
-    if (mu_button(ctx, "Dirt")) { *powder = DIRT; }
-    if (mu_button(ctx, "Stone")) { *powder = STONE; }
-    if (mu_button(ctx, "Water")) { *powder = WATER; }
-    if (mu_button(ctx, "Portal")) { *powder = PORTAL; }
+    for (const auto& pair : powderNames) {
+      if (mu_button(ctx, pair.second.c_str())) {
+        *powder = pair.first;
+      }
+    }
     mu_end_window(ctx);
   }
 }
@@ -73,31 +95,52 @@ static int text_height(mu_Font font) {
 
 void process_powder()
 {
-  // std::vector<std::vector<PowderType>> newWorld (EMPTY);
-  // for (size_t y = 0; y < H; ++y)
-  // {
-  //   for (size_t x = 0; x < W; ++x)
-  //   {
-  //     switch (world[y][x])
-  //     {
-  //       case DIRT:
-  //       case STONE:
-  //       case WATER:
-  //         if (y > 0 && world[y - 1][x] == EMPTY)
-  //         {
-  //           newWorld[y - 1][x] = DIRT;
-  //         }
-  //         else
-  //         {
-  //           newWorld[y][x] = DIRT;
-  //         }
-  //         break;
-  //       default:
-  //         break;
-  //     }
-  //   }
-  // }
-  // world = newWorld;
+  std::vector<std::vector<PowderType>> newWorld (H, std::vector<PowderType>(W, EMPTY));
+  for (size_t y = 0; y < H; ++y)
+  {
+    for (size_t x = 0; x < W; ++x)
+    {
+      switch (world[y][x])
+      {
+        case DIRT:
+        {
+          if (y > 0 && world[y - 1][x] == EMPTY)
+          {
+            newWorld[y - 1][x] = DIRT;
+          }
+          else
+          {
+            newWorld[y][x] = DIRT;
+          }
+          break;
+        }
+        case STONE:
+        {
+          size_t dy = 1;
+          while (dy <= worldData[y][x].dy + 1 && y >= dy && world[y - dy][x] == EMPTY)
+            ++dy;
+          --dy;
+          if (dy > 0)
+          {
+            newWorld[y - dy][x] = STONE;
+            worldData[y - dy][x] = worldData[y][x];
+            worldData[y - dy][x].dy = dy;
+          }
+          else
+          {
+            newWorld[y][x] = STONE;
+            worldData[y][x].dy = 0;
+          }
+          break;
+        }
+        default:
+        {
+          break;
+        }
+      }
+    }
+  }
+  world = newWorld;
 }
 
 void render_powder()
@@ -107,18 +150,16 @@ void render_powder()
   {
     for (size_t x = 0; x < W; ++x)
     {
-      if (world[y][x] != EMPTY)
-        fenster_pixel(wnd, x, y) = r_color({255, 255, 255, 255});
+      if (world[y][x] == DIRT)
+        fenster_pixel(wnd, x, H - y) = r_color({255, 128, 64, 255});
+      else if (world[y][x] == STONE)
+        fenster_pixel(wnd, x, H - y) = r_color({128, 128, 128, 255});
     }
   }
 }
 
 int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   r_init(W, H);
-  // debug
-  for (int i = 0; i < W; ++i)
-    for (int j = 0; j < 100; ++j)
-      world[j][i] = DIRT;
 
   /* init microui */
   mu_Context *ctx = (mu_Context*)malloc(sizeof(mu_Context));
@@ -130,6 +171,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   int mousex = 0, mousey = 0;
   uint8_t brush_size = 1;
   PowderType powder = DIRT;
+  bool isDrawing = false;
 
   /* main loop */
   for (;;) {
@@ -139,10 +181,36 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
     }
     if (r_mouse_down()) {
       mu_input_mousedown(ctx, mousex, mousey, MU_MOUSE_LEFT);
+      if (!ctx->hover_root)
+        isDrawing = true;
     } else if (r_mouse_up()) {
       mu_input_mouseup(ctx, mousex, mousey, MU_MOUSE_LEFT);
+      isDrawing = false;
     }
-    // TODO(max): scroll
+    // from claude
+    if (isDrawing) {
+      if (brush_size == 1) {
+        world[H - mousey - 1][mousex] = powder;
+      } else if (brush_size > 1) {
+        int x = 0, y = brush_size, d = 1 - brush_size;
+
+        auto fillRow = [&](int row, int x0, int x1) {
+          if (row < 0 || row >= H) return;
+            for (int i = std::max(0, x0); i <= std::min(W - 1, x1); i++)
+                world[row][i] = powder;
+        };
+
+        fillRow(H - mousey - 1, mousex - brush_size, mousex + brush_size);
+        while (x < y) {
+          x++;
+          d += d < 0 ? 2 * x + 1 : 2 * (x - y--) + 1;
+          fillRow(H - mousey - 1 + y, mousex - x, mousex + x);
+          fillRow(H - mousey - 1 - y, mousex - x, mousex + x);
+          fillRow(H - mousey - 1 + x, mousex - y, mousex + y);
+          fillRow(H - mousey - 1 - x, mousex - y, mousex + y);
+        }
+      }
+    }
     if (r_key_down(0x1b)) { break; }  // esc
     if (r_key_down('\n')) { mu_input_keydown(ctx, MU_KEY_RETURN); }
     else if (r_key_up('\n')) { mu_input_keyup(ctx, MU_KEY_RETURN); }
@@ -157,14 +225,10 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
               text[0] = tolower(i);
             }
           }
-          else {
-            // TODO(kartik): depends on keyboard layout
-          }
           mu_input_text(ctx, text);
         }
         continue;
       }
-      // TODO(max): mod
     }
 
     /* process frame */
