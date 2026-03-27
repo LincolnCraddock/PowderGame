@@ -1,0 +1,10 @@
+main
+*.out
+*.o
+*.elf
+*.exe
+*.wad
+*.dSYM/
+*.pdb
+*.d
+Makefile.local
