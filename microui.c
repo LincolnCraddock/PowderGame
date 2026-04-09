@@ -848,11 +848,15 @@ int mu_textbox_ex(mu_Context *ctx, char *buf, int bufsz, int opt) {
   return mu_textbox_raw(ctx, buf, bufsz, id, r, opt);
 }
 
+char *mu_fmtstr (mu_Real v) {
+  char *buf = malloc(MU_MAX_FMT + 1);
+  snprintf(buf, MU_MAX_FMT + 1, MU_REAL_FMT, v);
+  return buf;
+}
 
 int mu_slider_ex(mu_Context *ctx, mu_Real *value, mu_Real low, mu_Real high,
-  mu_Real step, const char *fmt, int opt)
+  mu_Real step, char * (*f)(mu_Real), int opt)
 {
-  char buf[MU_MAX_FMT + 1];
   mu_Rect thumb;
   int x, w, res = 0;
   mu_Real last = *value, v = last;
@@ -884,8 +888,9 @@ int mu_slider_ex(mu_Context *ctx, mu_Real *value, mu_Real low, mu_Real high,
   thumb = mu_rect(base.x + x, base.y, w, base.h);
   mu_draw_control_frame(ctx, id, thumb, MU_COLOR_BUTTON, opt);
   /* draw text  */
-  sprintf(buf, fmt, v);
+  char *buf = f(v);
   mu_draw_control_text(ctx, buf, base, MU_COLOR_TEXT, opt);
+  free(buf);
 
   return res;
 }
