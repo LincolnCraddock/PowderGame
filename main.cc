@@ -11,6 +11,7 @@ extern "C" {
 #include <ranges>
 #include <vector>
 #include <map>
+#include <cmath>
 #include <iostream> //debug
 
 
@@ -49,7 +50,17 @@ static int uint8_slider(mu_Context *ctx, unsigned char *value, int low, int high
   return res;
 }
 
-static void tool_window(mu_Context *ctx, uint8_t *brush_size, PowderType *powder)
+static int float_slider(mu_Context *ctx, float *value) {
+  static float tmp;
+  mu_push_id(ctx, &value, sizeof(value));
+  tmp = *value;
+  int res = mu_slider_ex(ctx, &tmp, -10.0f, 10.0f, 0, "%.2f", MU_OPT_ALIGNCENTER);
+  *value = tmp;
+  mu_pop_id(ctx);
+  return res;
+}
+
+static void tool_window(mu_Context *ctx, uint8_t *brush_size, PowderType *powder, float *time_scale)
 {
   if (mu_begin_window(ctx, "Tools", mu_rect(0, 1, W, 200), 0)) {
     int sw = mu_get_current_container(ctx)->body.w - 80 - 20;
@@ -58,26 +69,28 @@ static void tool_window(mu_Context *ctx, uint8_t *brush_size, PowderType *powder
     mu_label(ctx, "Brush Size");
     uint8_slider(ctx, brush_size, 1, 100);
     int bw = (sw + 4) / powderNames.size() - 4;
-    // int widths2[] { 80, bw, bw, bw, bw, -1 };
-    std::vector<int> widths3(powderNames.size() + 2, bw);
-    widths3[0] = 80;
-    widths3[1] += (sw + 4) % powderNames.size();
-    widths3.back() = -1;
-    mu_layout_row(ctx, powderNames.size() + 1, widths3.data(), 0);
+    std::vector<int> widths2(powderNames.size() + 2, bw);
+    widths2[0] = 80;
+    widths2[1] += (sw + 4) % powderNames.size();
+    widths2.back() = -1;
+    mu_layout_row(ctx, powderNames.size() + 1, widths2.data(), 0);
     mu_label(ctx, "Powder:");
     for (const auto& pair : powderNames) {
       if (mu_button(ctx, pair.second.c_str())) {
         *powder = pair.first;
       }
     }
+    mu_layout_row(ctx, 2, widths1, 0);
+    mu_label(ctx, "Time Scale");
+    float_slider(ctx, time_scale);
     mu_end_window(ctx);
   }
 }
 
 
-static void process_frame(mu_Context *ctx, uint8_t *brush_size, PowderType *powder) {
+static void process_frame(mu_Context *ctx, uint8_t *brush_size, PowderType *powder, float *time_scale) {
   mu_begin(ctx);
-  tool_window(ctx, brush_size, powder);
+  tool_window(ctx, brush_size, powder, time_scale);
   mu_end(ctx);
 }
 
@@ -169,13 +182,18 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
 
   int fps = 60;
   int mousex = 0, mousey = 0;
+  int oldmousex = 0, oldmousey = 0;
   uint8_t brush_size = 1;
   PowderType powder = DIRT;
+  // float time_scale = std::numeric_limits<float>::infinity();
+  float time_scale = 1.0f;
   bool isDrawing = false;
 
   /* main loop */
   for (;;) {
     int64_t before = r_get_time();
+    oldmousex = mousex;
+    oldmousey = mousey;
     if (r_mouse_moved(&mousex, &mousey)) {
       mu_input_mousemove(ctx, mousex, mousey);
     }
@@ -189,27 +207,40 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
     }
     // from claude
     if (isDrawing) {
-      if (brush_size == 1) {
-        world[H - mousey - 1][mousex] = powder;
-      } else if (brush_size > 1) {
-        int x = 0, y = brush_size, d = 1 - brush_size;
-
-        auto fillRow = [&](int row, int x0, int x1) {
-          if (row < 0 || row >= H) return;
-            for (int i = std::max(0, x0); i <= std::min(W - 1, x1); i++)
-                world[row][i] = powder;
+        int cy = H - mousey - 1, cx = mousex;
+        int oy = H - oldmousey - 1, ox = oldmousex;
+        int dx = std::abs(cx - ox), dy = std::abs(cy - oy);
+        int sx = ox < cx ? 1 : -1, sy = oy < cy ? 1 : -1;
+        int err = dx - dy;
+        auto drawCircle = [&](int px, int py) {
+            if (brush_size == 1) {
+                if (py >= 0 && py < H && px >= 0 && px < W)
+                    world[py][px] = powder;
+                return;
+            }
+            int x = 0, y = brush_size, d = 1 - brush_size;
+            auto fillRow = [&](int row, int x0, int x1) {
+                if (row < 0 || row >= H) return;
+                for (int i = std::max(0, x0); i <= std::min(W - 1, x1); i++)
+                    world[row][i] = powder;
+            };
+            fillRow(py, px - brush_size, px + brush_size);
+            while (x < y) {
+                x++;
+                d += d < 0 ? 2 * x + 1 : 2 * (x - y--) + 1;
+                fillRow(py + y, px - x, px + x);
+                fillRow(py - y, px - x, px + x);
+                fillRow(py + x, px - y, px + y);
+                fillRow(py - x, px - y, px + y);
+            }
         };
-
-        fillRow(H - mousey - 1, mousex - brush_size, mousex + brush_size);
-        while (x < y) {
-          x++;
-          d += d < 0 ? 2 * x + 1 : 2 * (x - y--) + 1;
-          fillRow(H - mousey - 1 + y, mousex - x, mousex + x);
-          fillRow(H - mousey - 1 - y, mousex - x, mousex + x);
-          fillRow(H - mousey - 1 + x, mousex - y, mousex + y);
-          fillRow(H - mousey - 1 - x, mousex - y, mousex + y);
+        while (true) {
+            drawCircle(ox, oy);
+            if (ox == cx && oy == cy) break;
+            int e2 = 2 * err;
+            if (e2 > -dy) { err -= dy; ox += sx; }
+            if (e2 <  dx) { err += dx; oy += sy; }
         }
-      }
     }
     if (r_key_down(0x1b)) { break; }  // esc
     if (r_key_down('\n')) { mu_input_keydown(ctx, MU_KEY_RETURN); }
@@ -232,7 +263,7 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
     }
 
     /* process frame */
-    process_frame(ctx, &brush_size, &powder);
+    process_frame(ctx, &brush_size, &powder, &time_scale);
 
     /* render */
     r_clear(mu_color(bg[0], bg[1], bg[2], 255));
