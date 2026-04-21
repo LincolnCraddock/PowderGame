@@ -812,9 +812,11 @@ FENSTER_API int fenster_loop(struct fenster* f) {
 		switch (ev.type) {
 		case ConfigureNotify:
 			{
-				if (ev.xconfigure.width != f->win_width || ev.xconfigure.height != f->win_height) {
-					f->win_width = ev.xconfigure.width;
-					f->win_height = ev.xconfigure.height;
+				uint32_t ev_width = (uint32_t) ev.xconfigure.width;
+				uint32_t ev_height = (uint32_t) ev.xconfigure.height;
+				if (ev_width != f->win_width || ev_height != f->win_height) {
+					f->win_width = ev_width;
+					f->win_height = ev_height;
 					f->scale_x = (float)f->width / (float)f->win_width;
 					f->scale_y = (float)f->height / (float)f->win_height;
 #ifdef FENSTER_STRETCH
