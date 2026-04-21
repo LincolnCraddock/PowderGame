@@ -1,6 +1,7 @@
 #ifndef FENSTER_H
 #define FENSTER_H
 
+#include <cstdint>
 #define FENSTER_CURSOR
 #define FENSTER_STRETCH
 
@@ -12,6 +13,7 @@
 #include <stdio.h>
 #elif defined(_WIN32)
 #define FENSTER_WIN
+#include <tchar.h>
 #include <windows.h>
 #define WS_NORESIZE (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU)
 static void usleep(__int64 usec) {
@@ -421,7 +423,7 @@ typedef struct BINFO {
 
 static LRESULT CALLBACK fenster_wndproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	struct fenster* f = (struct fenster *)GetWindowLongPtr(hwnd, GWLP_USERDATA);
-	int new_width, new_height, key;
+	uint32_t new_width, new_height, key;
 	switch (msg) {
 	case WM_SIZE:
 		{
@@ -584,13 +586,16 @@ FENSTER_API int fenster_open(struct fenster* f) {
 		title_w[j] = f->title[i];
 		j += 2;
 	}
-	wc.lpszClassName = (LPCWSTR)title_w;
+	//changed 4-21-26, was wc.lpszClassName = (LPCWSTR)title_w;
+	wc.lpszClassName = _T(title_w);
 	RegisterClassEx(&wc);
 	win_style = f->allow_resize ? WS_OVERLAPPEDWINDOW : WS_NORESIZE;
 	AdjustWindowRectEx(&desired_rect, win_style, FALSE, WS_EX_CLIENTEDGE);
 	adjusted_width = desired_rect.right - desired_rect.left;
 	adjusted_height = desired_rect.bottom - desired_rect.top;
-	f->hwnd = CreateWindowEx(0, (LPCWSTR)title_w, (LPCWSTR)title_w, win_style, CW_USEDEFAULT, CW_USEDEFAULT,
+	//f->hwnd = CreateWindowEx(0, (LPCWSTR)title_w, (LPCWSTR)title_w, win_style, CW_USEDEFAULT, 
+	// CW_USEDEFAULT, adjusted_width, adjusted_height, NULL, NULL, hInstance, NULL);
+	f->hwnd = CreateWindowEx(0, _T(title_w), _T(title_w), win_style, CW_USEDEFAULT, CW_USEDEFAULT,
 		adjusted_width, adjusted_height, NULL, NULL, hInstance, NULL);
 	if (f->hwnd == NULL) return -1;
 	SetWindowLongPtr(f->hwnd, GWLP_USERDATA, (LONG_PTR)f);

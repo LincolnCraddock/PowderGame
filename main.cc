@@ -8,6 +8,7 @@ extern "C" {
 #include <ctype.h>
 #include <string.h>
 #include <stdlib.h>
+#include <numbers>
 #include <ranges>
 #include <vector>
 #include <map>
@@ -60,7 +61,7 @@ static int float_slider(mu_Context *ctx, float *value) {
   static float tmp;
   mu_push_id(ctx, &value, sizeof(value));
   tmp = *value;
-  int res = mu_slider_ex(ctx, &tmp, -M_PI_2 + 0.001f, M_PI_2 - 0.001f, 0, tan_representation, MU_OPT_ALIGNCENTER);
+  int res = mu_slider_ex(ctx, &tmp, -(std::numbers::pi)/2 + 0.001f, (std::numbers::pi)/2 - 0.001f, 0, tan_representation, MU_OPT_ALIGNCENTER);
   *value = tmp;
   mu_pop_id(ctx);
   return res;
