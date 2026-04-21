@@ -1,5 +1,5 @@
-CFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c99 -g -fcolor-diagnostics -fansi-escape-codes
-CXXFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c++20 -g -fcolor-diagnostics -fansi-escape-codes
+CFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c99 -ggdb
+CXXFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c++20 -ggdb
 LDLIBS = -lm
 SOURCES_C := renderer.c microui.c
 SOURCES_CXX := main.cc
