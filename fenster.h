@@ -1,7 +1,6 @@
 #ifndef FENSTER_H
 #define FENSTER_H
 
-#include <cstdint>
 #define FENSTER_CURSOR
 #define FENSTER_STRETCH
 
@@ -559,7 +558,7 @@ FENSTER_API int fenster_open(struct fenster* f) {
 	size_t title_len = strlen(f->title);
 	RECT desired_rect = {0, 0, f->width, f->height};
 	char* title_w;
-	int i;
+	size_t i;
 	int j = 0;
 
 	HINSTANCE hInstance = GetModuleHandle(NULL);
