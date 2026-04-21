@@ -170,9 +170,9 @@ void render_powder()
     for (size_t x = 0; x < W; ++x)
     {
       if (world[y][x] == DIRT)
-        fenster_pixel(wnd, x, H - y) = r_color({255, 128, 64, 255});
+        fenster_pixel(wnd, x, H - y - 1) = r_color({255, 128, 64, 255});
       else if (world[y][x] == STONE)
-        fenster_pixel(wnd, x, H - y) = r_color({128, 128, 128, 255});
+        fenster_pixel(wnd, x, H - y - 1) = r_color({128, 128, 128, 255});
     }
   }
 }
