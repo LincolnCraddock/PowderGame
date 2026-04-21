@@ -13,6 +13,7 @@ extern "C" {
 #include <vector>
 #include <map>
 #include <cmath>
+#include <limits>
 #include <iostream> //debug
 
 
@@ -53,7 +54,11 @@ static int uint8_slider(mu_Context *ctx, unsigned char *value, int low, int high
 
 static char * tan_representation (mu_Real value) {
   char *buf = (char*)malloc(sizeof(char) * (MU_MAX_FMT + 1));
-  snprintf(buf, MU_MAX_FMT + 1, "%.2f", std::tan(value));
+  float disp_value = 10.0f * std::tan(value);
+  if (disp_value > 9'000.0f)
+    snprintf(buf, MU_MAX_FMT + 1, "infinity");
+  else
+    snprintf(buf, MU_MAX_FMT + 1, "%.2f", disp_value);
   return buf;
 }
 
@@ -61,8 +66,11 @@ static int float_slider(mu_Context *ctx, float *value) {
   static float tmp;
   mu_push_id(ctx, &value, sizeof(value));
   tmp = *value;
-  int res = mu_slider_ex(ctx, &tmp, -(std::numbers::pi)/2 + 0.001f, (std::numbers::pi)/2 - 0.001f, 0, tan_representation, MU_OPT_ALIGNCENTER);
-  *value = tmp;
+  int res = mu_slider_ex(ctx, &tmp, 0.0f, (std::numbers::pi_v<float>)/2 - 0.001f, 0, tan_representation, MU_OPT_ALIGNCENTER);
+  if (tmp > 9'000.0f)
+    *value = std::numeric_limits<float>::infinity();
+  else
+    *value = tmp;
   mu_pop_id(ctx);
   return res;
 }
@@ -187,18 +195,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
   ctx->text_width = text_width;
   ctx->text_height = text_height;
 
-  int fps = 60;
+  const int fps = 60;
+  const int64_t frame_budget_ms = 1000 / fps;
   int mousex = 0, mousey = 0;
   int oldmousex = 0, oldmousey = 0;
   uint8_t brush_size = 1;
   PowderType powder = DIRT;
   // float time_scale = std::numeric_limits<float>::infinity();
-  float time_scale = 1.0f;
+  float time_scale = std::atan(60.0f / 10.0f);
   bool isDrawing = false;
 
   /* main loop */
+  int64_t time_of_last_compute = r_get_time();
   for (;;) {
-    int64_t before = r_get_time();
+    int64_t ui_before = r_get_time();
+
+    /* process user input */
     oldmousex = mousex;
     oldmousey = mousey;
     if (r_mouse_moved(&mousex, &mousey)) {
@@ -269,12 +281,11 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
       }
     }
 
-    /* process frame */
+    /* process next ui frame */
     process_frame(ctx, &brush_size, &powder, &time_scale);
 
     /* render */
     r_clear(mu_color(bg[0], bg[1], bg[2], 255));
-    process_powder();
     render_powder();
     mu_Command *cmd = NULL;
     while (mu_next_command(ctx, &cmd)) {
@@ -286,10 +297,22 @@ int main([[maybe_unused]] int argc, [[maybe_unused]] char **argv) {
       }
     }
     r_present();
-    int64_t after = r_get_time();
-    int64_t paint_time_ms = after - before;
-    int64_t frame_budget_ms = 1000 / fps;
-    int64_t sleep_time_ms = frame_budget_ms - paint_time_ms;
+
+    int64_t ui_after = r_get_time();
+    int64_t ui_time_ms = ui_after - ui_before;
+    int64_t compute_before = r_get_time();
+
+    // compute frames at a rate set by time_scale
+    if (compute_before - time_of_last_compute > 1000 / std::tan(time_scale) / 10)
+    {
+      time_of_last_compute = compute_before;
+      /* compute a timestep in the powder simulation */
+      process_powder();
+    }
+
+    int64_t compute_after = r_get_time();
+    int64_t compute_time_ms = compute_after - compute_before;
+    int64_t sleep_time_ms = frame_budget_ms - ui_time_ms - compute_time_ms;
     if (sleep_time_ms > 0) {
       r_sleep(sleep_time_ms);
     }
