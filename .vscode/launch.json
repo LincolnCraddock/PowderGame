@@ -18,7 +18,7 @@
             "type": "lldb",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
-            "args": [],
+            "args": ["--size", "1200,", "1000"],
             "cwd": "${fileDirname}",
             "preLaunchTask": "Build with Makefile",
         },
