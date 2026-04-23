@@ -40,6 +40,7 @@ std::map<PowderType, mu_Color> powderColors {
 
 struct Data
 {
+  PowderType type = EMPTY;
   // only computed for stone
   uint32_t dy = 0;
 };
@@ -47,8 +48,7 @@ struct Data
 size_t W = 1000;
 size_t H = 1000;
 static float bg[3] = { 0, 0, 0 };
-static std::vector<std::vector<PowderType>> world;
-static std::vector<std::vector<Data>> worldData;
+static std::vector<std::vector<Data>> world;
 
 // Sets the W and H global vars, which represent the width and height of the
 // window.
@@ -109,10 +109,8 @@ int
 main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 {
   setWH (argc, argv);
-  world = std::vector<std::vector<PowderType>> (
-    H, std::vector<PowderType> (W, EMPTY));
-  worldData =
-    std::vector<std::vector<Data>> (H, std::vector<Data> (W, Data {}));
+  world =
+    std::vector<std::vector<Data>> (H, std::vector<Data> (W, {EMPTY, 0}));
   r_init (W, H);
 
   /* init microui */
@@ -171,7 +169,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         if (brush_size == 1)
         {
           if (py >= 0 && (size_t) py < H && px >= 0 && (size_t) px < W)
-            world[py][px] = powder;
+            world[py][px] = {powder, 0};
           return;
         }
         int x = 0, y = brush_size - 1, d = -brush_size;
@@ -180,7 +178,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
           if (row < 0 || (size_t) row >= H)
             return;
           for (int i = std::max (0, x0); i <= std::min ((int) W - 1, x1); i++)
-            world[row][i] = powder;
+            world[row][i] = {powder, 0};
         };
         fillRow (py, px - brush_size - 1, px + brush_size - 1);
         while (x < y)
@@ -667,43 +665,40 @@ text_height (mu_Font font)
 void
 process_powder ()
 {
-  std::vector<std::vector<PowderType>> newWorld (
-    H, std::vector<PowderType> (W, EMPTY));
+  std::vector<std::vector<Data>> newWorld (
+    H, std::vector<Data> (W, {EMPTY, 0}));
   for (size_t y = 0; y < H; ++y)
   {
     for (size_t x = 0; x < W; ++x)
     {
-      switch (world[y][x])
+      switch (world[y][x].type)
       {
         case DIRT:
         {
-          if (y > 0 && world[y - 1][x] == EMPTY)
+          if (y > 0 && world[y - 1][x].type == EMPTY)
           {
-            newWorld[y - 1][x] = DIRT;
+            newWorld[y - 1][x] = {DIRT, 0};
           }
           else
           {
-            newWorld[y][x] = DIRT;
+            newWorld[y][x] = {DIRT, 0};
           }
           break;
         }
         case STONE:
         {
-          size_t dy = 1;
-          while (dy <= worldData[y][x].dy + 1 && y >= dy &&
-                 world[y - dy][x] == EMPTY)
+          uint32_t dy = 1;
+          while (dy <= world[y][x].dy + 1 && y >= dy &&
+                 world[y - dy][x].type == EMPTY)
             ++dy;
           --dy;
           if (dy > 0)
           {
-            newWorld[y - dy][x] = STONE;
-            worldData[y - dy][x] = worldData[y][x];
-            worldData[y - dy][x].dy = dy;
+            newWorld[y - dy][x] = {STONE, dy};
           }
           else
           {
-            newWorld[y][x] = STONE;
-            worldData[y][x].dy = 0;
+            newWorld[y][x] = {STONE, 0};
           }
           break;
         }
@@ -725,7 +720,7 @@ render_powder ()
   {
     for (size_t x = 0; x < W; ++x)
     {
-      fenster_pixel(wnd, x, H - y - 1) = r_color (powderColors[world[y][x]]);
+      fenster_pixel(wnd, x, H - y - 1) = r_color (powderColors[world[y][x].type]);
     }
   }
 }
