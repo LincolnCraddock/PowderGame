@@ -667,6 +667,17 @@ process_powder ()
 {
   std::vector<std::vector<Data>> newWorld (
     H, std::vector<Data> (W, {EMPTY, 0}));
+  // parallel implementations
+  #if defined CUDA
+  // cuda call here
+    ProcessPowderCuda(world, newWorld, unsigned N)
+  #elif defined METAL
+  //metal call
+    break;
+  #elif defined HIP
+  //hip call
+  #else
+
   for (size_t y = 0; y < H; ++y)
   {
     for (size_t x = 0; x < W; ++x)
@@ -710,6 +721,7 @@ process_powder ()
     }
   }
   world = newWorld;
+  #endif
 }
 
 void
