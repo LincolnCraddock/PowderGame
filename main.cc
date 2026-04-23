@@ -23,13 +23,19 @@ enum PowderType
 {
   EMPTY,
   DIRT,
-  STONE
+  STONE,
 };
 
 std::map<PowderType, std::string> powderNames {
   { EMPTY, "Eraser" },
   { DIRT, "Dirt" },
   { STONE, "Stone" },
+};
+
+std::map<PowderType, mu_Color> powderColors {
+  { EMPTY, { 0, 0, 0, 255 } },
+  { DIRT, { 255, 128, 64, 255 } },
+  { STONE, { 128, 128, 128, 255 } },
 };
 
 struct Data
@@ -116,7 +122,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
   ctx->text_height = text_height;
 
   const int fps = 60;
-  const int64_t frame_budget_ms = 1000 / fps;
+  const int64_t frame_budget_ms = 1'000 / fps;
   int mousex = 0, mousey = 0;
   int oldmousex = 0, oldmousey = 0;
 
@@ -589,19 +595,23 @@ tool_window (mu_Context* ctx,
              float* time_scale,
              int64_t compute_time_ms)
 {
-  if (mu_begin_window (ctx, "Tools", mu_rect (0, 1, W, 200), 0))
+  if (mu_begin_window (ctx, "Tools", mu_rect (0, 1, W, 110), 0))
   {
+    // draw 1st row -- brush size
     int sw = mu_get_current_container (ctx)->body.w - 80 - 20;
     int widths1[] { 80, sw, -1 };
     mu_layout_row (ctx, 2, widths1, 0);
     mu_label (ctx, "Brush Size");
     uint8_slider (ctx, brush_size, 1, 100);
-    int bw = (sw + 4) / powderNames.size () - 4;
-    std::vector<int> widths2 (powderNames.size () + 2, bw);
+
+    // draw 2nd row -- powder type
+    int bw = (sw + 4 - 20 - 4) / powderNames.size () - 4;
+    std::vector<int> widths2 (powderNames.size () + 3, bw);
     widths2[0] = 80;
-    widths2[1] += (sw + 4) % powderNames.size ();
+    widths2[1] += (sw + 4 - 20 - 4) % powderNames.size ();
+    *--(--widths2.end ()) = 20;
     widths2.back () = -1;
-    mu_layout_row (ctx, powderNames.size () + 1, widths2.data (), 0);
+    mu_layout_row (ctx, powderNames.size () + 2, widths2.data (), 0);
     mu_label (ctx, "Powder:");
     for (const auto& pair : powderNames)
     {
@@ -610,12 +620,15 @@ tool_window (mu_Context* ctx,
         *powder = pair.first;
       }
     }
+    mu_draw_rect(ctx, mu_layout_next(ctx), powderColors[*powder]);
+
+    // draw 3rd row -- time scale
     int widths3[] { 80, sw - 160, 160, -1 };
     mu_layout_row (ctx, 3, widths3, 0);
     mu_label (ctx, "Time Scale:");
     float_slider (ctx, time_scale);
     static char buf[64];
-    snprintf (buf, 64, "Compute Time: %ld ms", compute_time_ms);
+    snprintf (buf, 64, "Compute Time: %lld ms", compute_time_ms);
     mu_label (ctx, buf);
     mu_end_window (ctx);
   }
@@ -712,10 +725,7 @@ render_powder ()
   {
     for (size_t x = 0; x < W; ++x)
     {
-      if (world[y][x] == DIRT)
-        fenster_pixel (wnd, x, H - y - 1) = r_color ({ 255, 128, 64, 255 });
-      else if (world[y][x] == STONE)
-        fenster_pixel (wnd, x, H - y - 1) = r_color ({ 128, 128, 128, 255 });
+      fenster_pixel(wnd, x, H - y - 1) = r_color (powderColors[world[y][x]]);
     }
   }
 }
