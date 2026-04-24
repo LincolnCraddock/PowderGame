@@ -1,3 +1,10 @@
+# Authors    : Lincoln Craddock, John Hershey
+# Date       : 2026-04-24
+# Description: complies main.cc, as well as renderer.c, renderer.h,
+# microui.c, microui.h, and fenster.h into an executable, with the
+# ability to compile against harware-specific files for parallelization,
+# specifically, processCuda for Nvidia, processHip for AMD, 
+# and processMetal for Apple
 CFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c99 -ggdb
 CXXFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c++20 -ggdb
 LDLIBS = -lm
@@ -7,6 +14,8 @@ OBJECTS := $(SOURCES_C:%.c=%.o) $(SOURCES_CXX:%.cc=%.o)
 DEPS := $(SOURCES_C:%.c=%.d) $(SOURCES_CXX:%.cc=%.d)
 TARGET = native
 MAIN = main
+#cxx for main, must be GPU-specific to link properly
+MAINCXX := $(CXX)
 ifeq ($(OS),Windows_NT)
     MAIN = main.exe
     LDLIBS += -lgdi32
@@ -24,17 +33,22 @@ else
 endif
 #allows for checking type of input gpu
 ifeq ($(GPU_TYPE),CUDA)
-    $(info cuda)
+    $(info compiling for cuda)
     CUDAFLAGS = -O3 -std=c++20 -Xptxas -O3 -Xcompiler -Wall,-Werror
+    #CXXFLAGS += -L/usr/local/cuda/lib32
+    #LDLIBS += -lcuda
+    #LDLIBS += -lcudart
+    OBJECTS += cudagpu.o
+    MAINCXX := nvcc
+    all: cudagpu.o $(MAIN)
     
-    GPU.o: ProcessCuda.cu
+    cudagpu.o: %.cu
 		nvcc $(CUDAFLAGS) -c $< -o $@
-    objects += GPU.o
-    
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
     HIPFLAGS = --offload-arch=native
-    #GPU.o: ProcessHip.cc
+    HIPGPU.o: ProcessHip.cc
+        hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
     test
@@ -43,7 +57,7 @@ else ifeq ($(GPU_TYPE),METAL)
 endif
 
 $(MAIN): $(OBJECTS)
-	$(CXX) -o $(MAIN) $(OBJECTS) $(LDLIBS)
+	$(MAINCXX) -o $(MAIN) $(OBJECTS) $(LDLIBS)
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -MMD -c -o $@ $<
 %.o: %.c
@@ -52,7 +66,7 @@ $(MAIN): $(OBJECTS)
 
 .PHONY: clean cuda hip metal
 clean:
-	rm -f $(MAIN) $(OBJECTS) $(DEPS) GPU.o
+	rm -f $(MAIN) $(OBJECTS) $(DEPS) *.o
 
 cuda:
 	make GPU_TYPE=CUDA
