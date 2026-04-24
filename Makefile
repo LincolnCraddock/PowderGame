@@ -25,8 +25,14 @@ endif
 #allows for checking type of input gpu
 ifeq ($(GPU_TYPE),CUDA)
     $(info cuda)
+    CUDAFLAGS = -O3 -std=c++20 -Xptxas -O3 -Xcompiler -Wall,-Werror
+    GPU.o: ProcessCuda.cu
+		nvcc $(CUDAFLAGS) -c $< -o $@
+    objects += GPU.o
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
+    HIPFLAGS = --offload-arch=native
+    #GPU.o: ProcessHip.cc
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
 #else
@@ -51,9 +57,3 @@ hip:
 	make GPU_TYPE=HIP
 metal:
 	make GPU_TYPE=METAL
-# define test
-# 	MAIN = main
-# endef
-# test:
-# 	$(call test)
-# test1 = 3

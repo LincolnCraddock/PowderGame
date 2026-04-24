@@ -11,39 +11,16 @@ extern "C"
 #include <getopt.h>
 #include <iostream> //debug
 #include <limits>
-#include <map>
 #include <numbers>
 #include <ranges>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
+#include <stdlib.h>
+
 #include <vector>
 
-enum PowderType
-{
-  EMPTY,
-  DIRT,
-  STONE,
-};
+#include "PowderGame.h"
 
-std::map<PowderType, std::string> powderNames {
-  { EMPTY, "Eraser" },
-  { DIRT, "Dirt" },
-  { STONE, "Stone" },
-};
-
-std::map<PowderType, mu_Color> powderColors {
-  { EMPTY, { 0, 0, 0, 255 } },
-  { DIRT, { 255, 128, 64, 255 } },
-  { STONE, { 128, 128, 128, 255 } },
-};
-
-struct Data
-{
-  PowderType type = EMPTY;
-  // only computed for stone
-  uint32_t dy = 0;
-};
 
 size_t W = 1000;
 size_t H = 1000;
