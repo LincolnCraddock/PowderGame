@@ -626,7 +626,7 @@ tool_window (mu_Context* ctx,
     mu_label (ctx, "Time Scale:");
     float_slider (ctx, time_scale);
     static char buf[64];
-    snprintf (buf, 64, "Compute Time: %lld ms", compute_time_ms);
+    snprintf (buf, 64, "Compute Time: %ld ms", compute_time_ms);
     mu_label (ctx, buf);
     mu_end_window (ctx);
   }
