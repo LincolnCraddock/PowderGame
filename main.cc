@@ -647,7 +647,7 @@ process_powder ()
   // parallel implementations
   #if defined CUDA
   // cuda call here
-    ProcessPowderCuda(world, newWorld, unsigned N)
+    ProcessPowderCuda(world, newWorld, H, W)
   #elif defined METAL
   //metal call
     break;

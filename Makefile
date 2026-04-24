@@ -26,15 +26,18 @@ endif
 ifeq ($(GPU_TYPE),CUDA)
     $(info cuda)
     CUDAFLAGS = -O3 -std=c++20 -Xptxas -O3 -Xcompiler -Wall,-Werror
+    
     GPU.o: ProcessCuda.cu
 		nvcc $(CUDAFLAGS) -c $< -o $@
     objects += GPU.o
+    
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
     HIPFLAGS = --offload-arch=native
     #GPU.o: ProcessHip.cc
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
+    test
 #else
 #    $(info 4)
 endif
@@ -49,7 +52,7 @@ $(MAIN): $(OBJECTS)
 
 .PHONY: clean cuda hip metal
 clean:
-	rm -f $(MAIN) $(OBJECTS) $(DEPS)
+	rm -f $(MAIN) $(OBJECTS) $(DEPS) GPU.o
 
 cuda:
 	make GPU_TYPE=CUDA
@@ -57,3 +60,9 @@ hip:
 	make GPU_TYPE=HIP
 metal:
 	make GPU_TYPE=METAL
+# define test
+# 	MAIN = main
+# endef
+# test:
+# 	$(call test)
+# test1 = 3
