@@ -7,7 +7,6 @@ OBJECTS := $(SOURCES_C:%.c=%.o) $(SOURCES_CXX:%.cc=%.o)
 DEPS := $(SOURCES_C:%.c=%.d) $(SOURCES_CXX:%.cc=%.d)
 TARGET = native
 MAIN = main
-
 ifeq ($(OS),Windows_NT)
     MAIN = main.exe
     LDLIBS += -lgdi32
@@ -23,6 +22,16 @@ else
         LDLIBS += -lX11
     endif
 endif
+#allows for checking type of input gpu
+ifeq ($(GPU_TYPE),CUDA)
+    $(info cuda)
+else ifeq ($(GPU_TYPE),HIP)
+    $(info hip)
+else ifeq ($(GPU_TYPE),METAL)
+    $(info metal)
+#else
+#    $(info 4)
+endif
 
 $(MAIN): $(OBJECTS)
 	$(CXX) -o $(MAIN) $(OBJECTS) $(LDLIBS)
@@ -32,14 +41,16 @@ $(MAIN): $(OBJECTS)
 	$(CC) $(CFLAGS) -MMD -c -o $@ $<
 -include $(DEPS)
 
+.PHONY: clean cuda hip metal
 clean:
 	rm -f $(MAIN) $(OBJECTS) $(DEPS)
 
 cuda:
-	CXX := nvcc
-	
-.PHONY: clean cuda hip metal
-
+	make GPU_TYPE=CUDA
+hip:
+	make GPU_TYPE=HIP
+metal:
+	make GPU_TYPE=METAL
 # define test
 # 	MAIN = main
 # endef
