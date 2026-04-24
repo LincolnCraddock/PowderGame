@@ -26,15 +26,23 @@ endif
 
 $(MAIN): $(OBJECTS)
 	$(CXX) -o $(MAIN) $(OBJECTS) $(LDLIBS)
-
 %.o: %.cc
 	$(CXX) $(CXXFLAGS) -MMD -c -o $@ $<
-
 %.o: %.c
 	$(CC) $(CFLAGS) -MMD -c -o $@ $<
-
 -include $(DEPS)
 
 clean:
 	rm -f $(MAIN) $(OBJECTS) $(DEPS)
-.PHONY: clean
+
+cuda:
+	CXX := nvcc
+	
+.PHONY: clean cuda hip metal
+
+# define test
+# 	MAIN = main
+# endef
+# test:
+# 	$(call test)
+# test1 = 3
