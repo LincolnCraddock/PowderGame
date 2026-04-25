@@ -14,18 +14,17 @@ extern "C"
 #include <numbers>
 #include <ranges>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include <vector>
 
 #include "PowderGame.h"
-
 
 size_t W = 1000;
 size_t H = 1000;
 static float bg[3] = { 0, 0, 0 };
 static std::vector<std::vector<Data>> world;
+static float tan_time_scale = 60.0f;
 
 // Sets the W and H global vars, which represent the width and height of the
 // window.
@@ -41,6 +40,8 @@ static int
 uint8_slider (mu_Context* ctx, unsigned char* value, int low, int high);
 
 // Takes the tan() of a float and returns a string representing that value.
+//
+// Also updates the public variable tan_time_scale
 static char*
 tan_representation (mu_Real value);
 
@@ -83,11 +84,11 @@ void
 render_powder ();
 
 int
-main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
+main (int argc, char** argv)
 {
   setWH (argc, argv);
   world =
-    std::vector<std::vector<Data>> (H, std::vector<Data> (W, {EMPTY, 0}));
+    std::vector<std::vector<Data>> (H, std::vector<Data> (W, { EMPTY, 0 }));
   r_init (W, H);
 
   /* init microui */
@@ -103,7 +104,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
 
   uint8_t brush_size = 1;
   PowderType powder = DIRT;
-  float time_scale = std::atan (60.0f / 10.0f);
+  float time_scale = std::atan (tan_time_scale / 10.0f);
   bool isDrawing = false;
 
   int64_t compute_time_ms = 0;
@@ -146,7 +147,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         if (brush_size == 1)
         {
           if (py >= 0 && (size_t) py < H && px >= 0 && (size_t) px < W)
-            world[py][px] = {powder, 0};
+            world[py][px] = { powder, 0 };
           return;
         }
         int x = 0, y = brush_size - 1, d = -brush_size;
@@ -155,7 +156,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
           if (row < 0 || (size_t) row >= H)
             return;
           for (int i = std::max (0, x0); i <= std::min ((int) W - 1, x1); i++)
-            world[row][i] = {powder, 0};
+            world[row][i] = { powder, 0 };
         };
         fillRow (py, px - brush_size - 1, px + brush_size - 1);
         while (x < y)
@@ -186,6 +187,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
         }
       }
     }
+
     if (r_key_down (0x1b))
     {
       break;
@@ -260,8 +262,7 @@ main ([[maybe_unused]] int argc, [[maybe_unused]] char** argv)
     int64_t sleep_time_ms = frame_budget_ms - ui_time_ms;
 
     // compute frames at a rate set by time_scale
-    if (compute_before - time_of_last_compute >
-        1000 / std::tan (time_scale) / 10)
+    if (compute_before - time_of_last_compute > 1000 / tan_time_scale)
     {
       time_of_last_compute = compute_before;
       /* compute a timestep in the powder simulation */
@@ -534,11 +535,11 @@ static char*
 tan_representation (mu_Real value)
 {
   char* buf = (char*) malloc (sizeof (char) * (MU_MAX_FMT + 1));
-  float disp_value = 10.0f * std::tan (value);
-  if (disp_value > 9'000.0f)
+  tan_time_scale = 10.0f * std::tan (value);
+  if (tan_time_scale > 9'000.0f)
     snprintf (buf, MU_MAX_FMT + 1, "infinity");
   else
-    snprintf (buf, MU_MAX_FMT + 1, "%.2f", disp_value);
+    snprintf (buf, MU_MAX_FMT + 1, "%.2f", tan_time_scale);
   return buf;
 }
 
@@ -595,7 +596,7 @@ tool_window (mu_Context* ctx,
         *powder = pair.first;
       }
     }
-    mu_draw_rect(ctx, mu_layout_next(ctx), powderColors[*powder]);
+    mu_draw_rect (ctx, mu_layout_next (ctx), powderColors[*powder]);
 
     // draw 3rd row -- time scale
     int widths3[] { 80, sw - 160, 160, -1 };
@@ -642,18 +643,18 @@ text_height (mu_Font font)
 void
 process_powder ()
 {
-  std::vector<std::vector<Data>> newWorld (
-    H, std::vector<Data> (W, {EMPTY, 0}));
-  // parallel implementations
-  #if defined CUDA
+  std::vector<std::vector<Data>> newWorld (H,
+                                           std::vector<Data> (W, { EMPTY, 0 }));
+// parallel implementations
+#if defined CUDA
   // cuda call here
-    ProcessPowderCuda(world, newWorld, unsigned N)
-  #elif defined METAL
-  //metal call
-    break;
-  #elif defined HIP
-  //hip call
-  #else
+  ProcessPowderCuda (world, newWorld, unsigned N)
+#elif defined METAL
+  // metal call
+  break;
+#elif defined HIP
+// hip call
+#else
 
   for (size_t y = 0; y < H; ++y)
   {
@@ -665,11 +666,11 @@ process_powder ()
         {
           if (y > 0 && world[y - 1][x].type == EMPTY)
           {
-            newWorld[y - 1][x] = {DIRT, 0};
+            newWorld[y - 1][x] = { DIRT, 0 };
           }
           else
           {
-            newWorld[y][x] = {DIRT, 0};
+            newWorld[y][x] = { DIRT, 0 };
           }
           break;
         }
@@ -682,11 +683,11 @@ process_powder ()
           --dy;
           if (dy > 0)
           {
-            newWorld[y - dy][x] = {STONE, dy};
+            newWorld[y - dy][x] = { STONE, dy };
           }
           else
           {
-            newWorld[y][x] = {STONE, 0};
+            newWorld[y][x] = { STONE, 0 };
           }
           break;
         }
@@ -698,7 +699,7 @@ process_powder ()
     }
   }
   world = newWorld;
-  #endif
+#endif
 }
 
 void
@@ -709,7 +710,8 @@ render_powder ()
   {
     for (size_t x = 0; x < W; ++x)
     {
-      fenster_pixel(wnd, x, H - y - 1) = r_color (powderColors[world[y][x].type]);
+      fenster_pixel (wnd, x, H - y - 1) =
+        r_color (powderColors[world[y][x].type]);
     }
   }
 }
