@@ -1,3 +1,10 @@
+/*
+ * Authors: Lincoln Craddock, John Hershey
+ * Last Edit Date: 2026-04-24
+ * Professor: Dr. Gary Zoppetti
+ * Class: CMSC 476 Parallel Programming
+ * Description: Uses Fenster to render a gravity-based powder simulation
+ */
 extern "C"
 {
 #include "fenster.h"
@@ -604,7 +611,7 @@ tool_window (mu_Context* ctx,
     mu_label (ctx, "Time Scale:");
     float_slider (ctx, time_scale);
     static char buf[64];
-    snprintf (buf, 64, "Compute Time: %ld ms", compute_time_ms);
+    snprintf (buf, 64, "Compute Time: %lld ms", (long long) compute_time_ms);
     mu_label (ctx, buf);
     mu_end_window (ctx);
   }
@@ -648,7 +655,7 @@ process_powder ()
 // parallel implementations
 #if defined CUDA
   // cuda call here
-  ProcessPowderCuda (world, newWorld, unsigned N)
+  ProcessPowderCuda (world, newWorld, H, W)
 #elif defined METAL
   // metal call
   break;
