@@ -23,6 +23,12 @@ extern "C"
 #include <stdio.h>
 #include <stdlib.h>
 
+#if defined METAL
+#define NS_PRIVATE_IMPLEMENTATION
+#define MTL_PRIVATE_IMPLEMENTATION
+#include "metal-cpp/Metal/Metal.hpp"
+#endif
+
 #include "PowderGame.h"
 
 size_t W = 1000;
@@ -109,6 +115,102 @@ main (int argc, char** argv)
   PowderType powder = DIRT;
   float time_scale = std::atan (tan_time_scale / 10.0f);
   bool isDrawing = false;
+
+#if defined METAL
+  /* Find a GPU */
+  MTL::Device* device = MTL::CreateSystemDefaultDevice ();
+  if (!device)
+  {
+    std::cerr << "Metal not supported" << std::endl;
+    return 1;
+  }
+  std::cout << "Using GPU: " << device->name ()->utf8String () << "\n";
+
+  if (device->supportsFamily (MTL::GPUFamilyMetal4))
+    std::cout << "Supports Metal 4!" << std::endl;
+  else if (device->supportsFamily (MTL::GPUFamilyMetal3))
+    std::cout << "Only supports Metal 3..." << std::endl;
+
+  /* Metal function */
+  const char* shaderSrc = R"(
+#include <metal_stdlib>
+using namespace metal;
+
+struct Data
+{
+PowderType type = EMPTY;
+uint32_t dy = 0;
+};
+
+kernel void process_powder (
+device const Data* world [[ buffer (0) ]],
+device Data* newWorld [[ buffer (1) ]],
+uint index [[ thread_position_in_grid ]]
+) {
+// TODO
+newWorld[index] = world[index];
+}
+)";
+
+  /* Get a ref to the metal function */
+  NS::Error* error = nullptr;
+  NS::String* src = NS::String::string (shaderSrc, NS::UTF8StringEncoding);
+  MTL::CompileOptions* opts = MTL::CompileOptions::alloc ()->init ();
+  MTL::Library* library = device->newLibrary (src, opts, &error);
+  if (!library)
+  {
+    std::cerr << "Shader error: "
+              << error->localizedDescription ()->utf8String () << std::endl;
+    return 1;
+  }
+
+  /* Prepare a metal pipeline */
+  NS::String* fnName =
+    NS::String::string ("process_powder", NS::UTF8StringEncoding);
+  MTL::Function* function = library->newFunction (fnName);
+  // A 'compute' pipeline runs a single 'compute' function
+  MTL::ComputePipelineState* pipeline =
+    device->newComputePipelineState (function, &error);
+
+  /* Create data buffers and load data into them */
+  const uint count = 16;
+  const size_t bufferSize = count * sizeof (Data);
+
+  MTL::Buffer* worldBuf = device->newBuffer (
+    world.data (), bufferSize, MTL::ResourceStorageModeShared);
+  // TODO: call a method to fill the data, not this
+  std::vector<std::vector<Data>> newWorld (H,
+                                           std::vector<Data> (W, { EMPTY, 0 }));
+  MTL::Buffer* newWorldBuf = device->newBuffer (
+    newWorld.data (), bufferSize, MTL::ResourceStorageModeShared);
+
+  /* Create descriptors */
+  MTL4::CommandQueueDescriptor* queueDesc =
+    MTL4::CommandQueueDescriptor::alloc ()->init ();
+  MTL4::CommandAllocatorDescriptor* allocDesc =
+    MTL4::CommandAllocatorDescriptor::alloc ()->init ();
+  MTL4::ArgumentTableDescriptor* tableDesc =
+    MTL4::ArgumentTableDescriptor::alloc ()->init ();
+  tableDesc->setMaxBufferBindCount (2);
+
+  /* Create a command queue, allocator, buffer, and argument table from
+   * descriptors */
+  MTL4::CommandQueue* queue = device->newMTL4CommandQueue (queueDesc, &error);
+  MTL4::CommandAllocator* allocator =
+    device->newCommandAllocator (allocDesc, &error);
+  MTL4::CommandBuffer* cmdBuf = device->newCommandBuffer ();
+  MTL4::ArgumentTable* argTable = device->newArgumentTable (tableDesc, &error);
+
+  /* Give the argument table access to data */
+  // the indices (0 and 1) represent the paramaters the buffers supply
+  argTable->setAddress (worldBuf->gpuAddress (), 0);
+  argTable->setAddress (newWorldBuf->gpuAddress (), 1);
+
+  /* Create a shared event */
+  MTL::SharedEvent* frameCompletionEvent = device->newSharedEvent ();
+  uint64_t frameIdx = 0;
+  frameCompletionEvent->setSignaledValue (frameIdx);
+#endif
 
   int64_t compute_time_ms = 0;
   int64_t ui_time_ms = 0;
@@ -268,10 +370,53 @@ main (int argc, char** argv)
     if (compute_before - time_of_last_compute > 1000 / tan_time_scale)
     {
       time_of_last_compute = compute_before;
-      /* compute a timestep in the powder simulation */
-      std::vector<std::vector<Data>> newWorld (H,
-                                           std::vector<Data> (W, { EMPTY, 0 }));
+/* compute a timestep in the powder simulation */
+#if defined METAL
+      /* Wait for GPU to finish to begin next frame*/
+      frameCompletionEvent->waitUntilSignaledValue (
+        frameIdx - 1, /* timeout milliseconds = */ 1000);
+      ++frameIdx;
+
+      /* Create a command encoder that reuses the allocator */
+      allocator->reset ();
+      cmdBuf->beginCommandBuffer (allocator);
+      MTL4::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder ();
+
+      /* Write data in the argument table to the buffer via the encoder */
+      encoder->setArgumentTable (argTable);
+
+      /* Write commands to the buffer via the encoder */
+      encoder->setComputePipelineState (pipeline);
+
+      // count × 1 × 1 grid of threads
+      // TODO: 2D
+      MTL::Size threadsPerGrid = MTL::Size (count, 1, 1);
+      NS::UInteger maxThreads = pipeline->maxTotalThreadsPerThreadgroup ();
+      if (maxThreads > count)
+        maxThreads = count;
+      MTL::Size threadsPerGroup = MTL::Size (maxThreads, 1, 1);
+      encoder->dispatchThreads (threadsPerGrid, threadsPerGroup);
+      encoder->endEncoding ();
+      cmdBuf->endCommandBuffer ();
+
+      // /* Finally, run the commands encoded in the command buffer on the GPU
+      // */ cmdBuf->commit ();
+
+      /* Finally, run the commands encoded in the command buffer on the GPU */
+      MTL4::CommitOptions* commitOpts = MTL4::CommitOptions::alloc ()->init ();
+      queue->commit (&cmdBuf, 1, commitOpts);
+      commitOpts->release ();
+
+      // /* Wait until the commands have finished */
+      // cmdBuf->waitUntilCompleted ();
+
+      /* Wait until the commands have finished */
+      queue->signalEvent (frameCompletionEvent, frameIdx);
+#else
+      std::vector<std::vector<Data>> newWorld (
+        H, std::vector<Data> (W, { EMPTY, 0 }));
       process_powder (world, newWorld, H, W);
+#endif
       world = newWorld;
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
@@ -645,6 +790,58 @@ text_height (mu_Font font)
   return r_get_text_height ();
 }
 
+#if defined METAL
+void
+process_powder ()
+{
+  std::vector<std::vector<Data>> newWorld (H,
+                                           std::vector<Data> (W, { EMPTY, 0 }));
+
+  for (size_t y = 0; y < H; ++y)
+  {
+    for (size_t x = 0; x < W; ++x)
+    {
+      switch (world[y][x].type)
+      {
+        case DIRT:
+        {
+          if (y > 0 && world[y - 1][x].type == EMPTY)
+          {
+            newWorld[y - 1][x] = { DIRT, 0 };
+          }
+          else
+          {
+            newWorld[y][x] = { DIRT, 0 };
+          }
+          break;
+        }
+        case STONE:
+        {
+          uint32_t dy = 1;
+          while (dy <= world[y][x].dy + 1 && y >= dy &&
+                 world[y - dy][x].type == EMPTY)
+            ++dy;
+          --dy;
+          if (dy > 0)
+          {
+            newWorld[y - dy][x] = { STONE, dy };
+          }
+          else
+          {
+            newWorld[y][x] = { STONE, 0 };
+          }
+          break;
+        }
+        default:
+        {
+          break;
+        }
+      }
+    }
+  }
+  world = newWorld;
+}
+#endif
 
 void
 render_powder ()
