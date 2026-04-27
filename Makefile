@@ -46,8 +46,12 @@ ifeq ($(GPU_TYPE),CUDA)
 		nvcc $(CUDAFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
-    HIPFLAGS = --offload-arch=native
-    HIPGPU.o: ProcessHip.cc
+    HIPFLAGS = --offload-arch=native -O3
+    OBJECTS += cudagpu.o
+    MAINCXX := hipcc
+    all: hipgpu.o $(MAIN)
+    
+    hipgpu.o: ProcessHip.cc
         hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)

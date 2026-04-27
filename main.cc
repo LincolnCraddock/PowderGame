@@ -660,7 +660,8 @@ process_powder ()
   // metal call
   break;
 #elif defined HIP
-// hip call
+  // hip call
+  ProcessPowderHip(world, newWorld, H, W)
 #else
 
   for (size_t y = 0; y < H; ++y)
