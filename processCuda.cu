@@ -23,32 +23,29 @@ __global__//
 void
 ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
 
-
-// int
-// main(){
-//   std::vector<std::vector<Data>> newWorld (1000,
-//                                            std::vector<Data> (1000, { EMPTY, 0 }));
-
-// }
 //pass in the input and output grids, and the size of the grid
-
 void
 ProcessPowderCuda(thrust::universal_vector<thrust::universal_vector<Data>> vec, thrust::universal_vector<thrust::universal_vector<Data>> result, unsigned H, unsigned W){
-    return;
-    printf("%s","rte");
-    const unsigned NUM_BLOCKS =
+  //thrust::universal_vector<float> result (1);  
+  
+  const unsigned NUM_BLOCKS =
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (
-    vec[0].data ().get (), result[0].data ().get (), H, W);
-    cudaDeviceSynchronize ();
+  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec[0].data ().get (), result[0].data ().get (), H, W);
+  cudaDeviceSynchronize ();
 }
 
-// wrap the function call
+//#define process_powder(world,  newWorld, H, W) ProcessPowderCuda(world, newWorld, H, W);
+//wrap the function call
+__host__
 void
 process_powder (std::vector<std::vector<Data>>& world, std::vector<std::vector<Data>>& newWorld, unsigned H, unsigned W)
-{
-  return;
-  //ProcessPowderCuda(world, newWorld, H, W);
+{ 
+  thrust::universal_vector<Data> result (1);
+  #ifndef __CUDA_ARCH__
+  //thrust::universal_vector<thrust::universal_vector<Data>> test(world.begin(),world.end());
+  #endif
+  //thrust::universal_vector<thrust::universal_vector<Data>> test2 = newWorld;    
+  //ProcessPowderCuda(test,test2, H, W);
 }
 
 __global__//

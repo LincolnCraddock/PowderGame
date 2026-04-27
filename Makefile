@@ -36,7 +36,7 @@ endif
 ifeq ($(GPU_TYPE),CUDA)
     $(info compiling for cuda)
     CUDAFLAGS = -O3 -std=c++20 -Xptxas -O3 -Xcompiler -Wall,-Werror
-    #OBJECTS += cudagpu.o
+    OBJECTS += cudagpu.o
     MAINCXX := nvcc
     ifeq ($(MAIN), main.exe)
         MAIN:=mainCuda.exe
@@ -60,7 +60,7 @@ else ifeq ($(GPU_TYPE),HIP)
     all: hipgpu.o $(MAIN)
     
     hipgpu.o: processHip.cc
-        hipcc $(HIPFLAGS) -c $< -o $@
+		hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
     METALFLAGS = -O3 #fix
@@ -74,7 +74,7 @@ else ifeq ($(GPU_TYPE),METAL)
     all: metalgpu.o $(MAIN)
     
     metalgpu.o: processMetal.cc
-        metal $(METALFLAGS) -c $< -o $@ #fix
+		metal $(METALFLAGS) -c $< -o $@ #fix
 else
     OBJECTS += processBase.o
 endif
