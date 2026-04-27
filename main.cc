@@ -22,8 +22,6 @@ extern "C"
 #include <ranges>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <vector>
 
 #include "PowderGame.h"
 
@@ -83,8 +81,6 @@ text_height (mu_Font font);
 
 // Computes a single step in the powder simulation. Call this at a rate
 // determined by the user.
-void
-process_powder ();
 
 // Displays the powder in the simulation. Call this every frame.
 void
@@ -273,8 +269,10 @@ main (int argc, char** argv)
     {
       time_of_last_compute = compute_before;
       /* compute a timestep in the powder simulation */
-      process_powder ();
-
+      std::vector<std::vector<Data>> newWorld (H,
+                                           std::vector<Data> (W, { EMPTY, 0 }));
+      process_powder (world, newWorld, H, W);
+      world = newWorld;
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
       sleep_time_ms -= compute_time_ms;
@@ -647,68 +645,6 @@ text_height (mu_Font font)
   return r_get_text_height ();
 }
 
-void
-process_powder ()
-{
-  std::vector<std::vector<Data>> newWorld (H,
-                                           std::vector<Data> (W, { EMPTY, 0 }));
-// parallel implementations
-#if defined CUDA
-  // cuda call here
-  ProcessPowderCuda (world, newWorld, H, W)
-#elif defined METAL
-  // metal call
-  break;
-#elif defined HIP
-  // hip call
-  ProcessPowderHip(world, newWorld, H, W)
-#else
-
-  for (size_t y = 0; y < H; ++y)
-  {
-    for (size_t x = 0; x < W; ++x)
-    {
-      switch (world[y][x].type)
-      {
-        case DIRT:
-        {
-          if (y > 0 && world[y - 1][x].type == EMPTY)
-          {
-            newWorld[y - 1][x] = { DIRT, 0 };
-          }
-          else
-          {
-            newWorld[y][x] = { DIRT, 0 };
-          }
-          break;
-        }
-        case STONE:
-        {
-          uint32_t dy = 1;
-          while (dy <= world[y][x].dy + 1 && y >= dy &&
-                 world[y - dy][x].type == EMPTY)
-            ++dy;
-          --dy;
-          if (dy > 0)
-          {
-            newWorld[y - dy][x] = { STONE, dy };
-          }
-          else
-          {
-            newWorld[y][x] = { STONE, 0 };
-          }
-          break;
-        }
-        default:
-        {
-          break;
-        }
-      }
-    }
-  }
-  world = newWorld;
-#endif
-}
 
 void
 render_powder ()

@@ -64,7 +64,9 @@ else ifeq ($(GPU_TYPE),HIP)
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
     METALFLAGS = -O3 #fix
-    OBJECTS += metalgpu.o
+    tempobs = OBJECTS
+    OBJECTS := metalgpu.o
+    OBJECTS += $(tempobs)
     MAINCXX := metal #fix
     ifeq ($(MAIN), main.exe)
         MAIN:=mainMetal.exe
@@ -75,6 +77,8 @@ else ifeq ($(GPU_TYPE),METAL)
     
     metalgpu.o: processMetal.cc
         metal $(METALFLAGS) -c $< -o $@ #fix
+else
+    OBJECTS += processBase.o
 endif
 
 $(MAIN): $(OBJECTS)

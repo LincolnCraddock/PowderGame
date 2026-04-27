@@ -6,7 +6,10 @@
  */
 
 #include <map>
+#include <vector>
 #include "microui.h"
+#include <string>
+
 enum PowderType
 {
   EMPTY,
@@ -30,5 +33,8 @@ struct Data
 {
   PowderType type = EMPTY;
   // only computed for stone
-  uint32_t dy = 0;
+  unsigned dy = 0;
 };
+
+extern void
+process_powder (std::vector<std::vector<Data>>& world, std::vector<std::vector<Data>>& newWorld, unsigned H, unsigned W);

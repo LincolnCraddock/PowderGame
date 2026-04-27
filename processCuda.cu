@@ -14,7 +14,6 @@
 
 #include "PowderGame.h"
 
-#define CUDA
 const unsigned THREADS_PER_BLOCK = 256;
 const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
@@ -24,17 +23,32 @@ __global__//
 void
 ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
 
+
+// int
+// main(){
+//   std::vector<std::vector<Data>> newWorld (1000,
+//                                            std::vector<Data> (1000, { EMPTY, 0 }));
+
+// }
 //pass in the input and output grids, and the size of the grid
-__host__//
+
 void
 ProcessPowderCuda(thrust::universal_vector<thrust::universal_vector<Data>> vec, thrust::universal_vector<thrust::universal_vector<Data>> result, unsigned H, unsigned W){
-
-    
+    return;
+    printf("%s","rte");
     const unsigned NUM_BLOCKS =
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
     ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (
     vec[0].data ().get (), result[0].data ().get (), H, W);
     cudaDeviceSynchronize ();
+}
+
+// wrap the function call
+void
+process_powder (std::vector<std::vector<Data>>& world, std::vector<std::vector<Data>>& newWorld, unsigned H, unsigned W)
+{
+  return;
+  //ProcessPowderCuda(world, newWorld, H, W);
 }
 
 __global__//
