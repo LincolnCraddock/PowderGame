@@ -9,14 +9,15 @@
  */
 #include <hip/hip_runtime.h>
 #include <assert.h>
+#include <hip_cooperative_groups.h>
+#include <thrust/universal_vector.h>
 
-
-#define HIP
+#include "PowderGame.h"
 
 const unsigned THREADS_PER_BLOCK = 256;
 const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
-//namespace cg = cooperative_groups;
+namespace cg = cooperative_groups;
 
 __global__ 
 void 
@@ -39,8 +40,9 @@ ProcessPowderHip (thrust::universal_vector<thrust::universal_vector<Data>> vec, 
   assert(error == hipSuccess);
 
   /* Run `do_an_addition` on one block containing one HIP thread. */
-  do_an_addition<<<dim3(1), dim3(1), 0, 0>>>(1, 2, result_ptr);
 
+  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(1, 2, result_ptr);
+  
   /* Copy result from device to host. This acts as a
      synchronization point, waiting for the kernel dispatch to
      complete. */
@@ -51,6 +53,8 @@ ProcessPowderHip (thrust::universal_vector<thrust::universal_vector<Data>> vec, 
   assert(result == 3);
   return 0;
 }
+
+
 
 __global__//
 void
