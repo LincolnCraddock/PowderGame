@@ -47,7 +47,7 @@ ifeq ($(GPU_TYPE),CUDA)
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
     HIPFLAGS = --offload-arch=native -O3
-    OBJECTS += cudagpu.o
+    OBJECTS += hipgpu.o
     MAINCXX := hipcc
     all: hipgpu.o $(MAIN)
     

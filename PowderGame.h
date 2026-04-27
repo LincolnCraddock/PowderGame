@@ -7,7 +7,6 @@
 
 #include <map>
 #include "microui.h"
-
 enum PowderType
 {
   EMPTY,
@@ -15,13 +14,13 @@ enum PowderType
   STONE,
 };
 
-std::map<PowderType, std::string> powderNames {
+static std::map<PowderType, std::string> powderNames {
   { EMPTY, "Eraser" },
   { DIRT, "Dirt" },
   { STONE, "Stone" },
 };
 
-std::map<PowderType, mu_Color> powderColors {
+static std::map<PowderType, mu_Color> powderColors {
   { EMPTY, { 0, 0, 0, 255 } },
   { DIRT, { 255, 128, 64, 255 } },
   { STONE, { 128, 128, 128, 255 } },

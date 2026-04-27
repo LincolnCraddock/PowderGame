@@ -11,7 +11,8 @@
 #include <cuda.h>
 #include <thrust/universal_vector.h>
 
-//#include "PowderGame.h"
+
+#include "PowderGame.h"
 
 #define CUDA
 const unsigned THREADS_PER_BLOCK = 256;
