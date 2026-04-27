@@ -1,5 +1,5 @@
 # Authors    : Lincoln Craddock, John Hershey
-# Date       : 2026-04-24
+# Date       : 2026-04-27
 # Description: complies main.cc, as well as renderer.c, renderer.h,
 # microui.c, microui.h, and fenster.h into an executable, with the
 # ability to compile against harware-specific files for parallelization,
@@ -16,11 +16,12 @@ TARGET = native
 MAIN = main
 #cxx for main, must be GPU-specific to link properly
 MAINCXX := $(CXX)
+#OS-specific compiliation
 ifeq ($(OS),Windows_NT)
-    MAIN = main.exe
+    MAIN := main.exe
     LDLIBS += -lgdi32
 else ifeq ($(TARGET), mingw)
-    MAIN = main.exe
+    MAIN := main.exe
     export CC = x86_64-w64-mingw32-gcc
     LDLIBS += -lgdi32
 else
@@ -31,15 +32,17 @@ else
         LDLIBS += -lX11
     endif
 endif
-#allows for checking type of input gpu
+#GPU-specific compilation
 ifeq ($(GPU_TYPE),CUDA)
     $(info compiling for cuda)
     CUDAFLAGS = -O3 -std=c++20 -Xptxas -O3 -Xcompiler -Wall,-Werror
-    #CXXFLAGS += -L/usr/local/cuda/lib32
-    #LDLIBS += -lcuda
-    #LDLIBS += -lcudart
     OBJECTS += cudagpu.o
     MAINCXX := nvcc
+    ifeq ($(MAIN), main.exe)
+        MAIN:=mainCuda.exe
+    else
+        MAIN:=mainCuda
+    endif
     all: cudagpu.o $(MAIN)
     
     cudagpu.o: processCuda.cu
@@ -49,15 +52,29 @@ else ifeq ($(GPU_TYPE),HIP)
     HIPFLAGS = --offload-arch=native -O3
     OBJECTS += hipgpu.o
     MAINCXX := hipcc
+    ifeq ($(MAIN), main.exe)
+        MAIN:=mainHip.exe
+    else
+        MAIN:=mainHip
+    endif
     all: hipgpu.o $(MAIN)
     
     hipgpu.o: processHip.cc
         hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
-    test
-#else
-#    $(info 4)
+    METALFLAGS = -O3 #fix
+    OBJECTS += metalgpu.o
+    MAINCXX := metal #fix
+    ifeq ($(MAIN), main.exe)
+        MAIN:=mainMetal.exe
+    else
+        MAIN:=mainMetal
+    endif
+    all: metalgpu.o $(MAIN)
+    
+    metalgpu.o: processMetal.cc
+        metal $(METALFLAGS) -c $< -o $@ #fix
 endif
 
 $(MAIN): $(OBJECTS)

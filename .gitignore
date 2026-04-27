@@ -7,4 +7,5 @@ main
 *.dSYM/
 *.pdb
 *.d
+*
 Makefile.local
