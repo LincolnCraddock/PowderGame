@@ -42,7 +42,7 @@ ifeq ($(GPU_TYPE),CUDA)
     MAINCXX := nvcc
     all: cudagpu.o $(MAIN)
     
-    cudagpu.o: %.cu
+    cudagpu.o: processCuda.cu
 		nvcc $(CUDAFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),HIP)
     $(info hip)
@@ -51,7 +51,7 @@ else ifeq ($(GPU_TYPE),HIP)
     MAINCXX := hipcc
     all: hipgpu.o $(MAIN)
     
-    hipgpu.o: ProcessHip.cc
+    hipgpu.o: processHip.cc
         hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
