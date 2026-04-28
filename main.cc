@@ -1,6 +1,6 @@
 /*
  * Authors: Lincoln Craddock, John Hershey
- * Last Edit Date: 2026-04-24
+ * Last Edit Date: 2026-04-28
  * Professor: Dr. Gary Zoppetti
  * Class: CMSC 476 Parallel Programming
  * Description: Uses Fenster to render a gravity-based powder simulation
@@ -413,9 +413,7 @@ newWorld[index] = world[index];
       /* Wait until the commands have finished */
       queue->signalEvent (frameCompletionEvent, frameIdx);
 #else
-      std::vector<std::vector<Data>> newWorld (
-        H, std::vector<Data> (W, { EMPTY, 0 }));
-      process_powder (world, newWorld, H, W);
+      std::vector<std::vector<Data>> newWorld = process_powder (world, H, W);
 #endif
       world = newWorld;
       int64_t compute_after = r_get_time ();

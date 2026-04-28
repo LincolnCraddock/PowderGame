@@ -1,6 +1,6 @@
 /*
  * Authors  : Lincoln Craddock, John Hershey
- * Date     : 2026-04-24
+ * Date     : 2026-04-28
  * Professor: Dr. Gary Zoppetti
  * Class    : CMSC 476 Parallel Programming
  * Description: Description: test file for HIP
@@ -19,13 +19,6 @@ const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
 namespace cg = cooperative_groups;
 
-__global__ 
-void 
-do_an_addition(int a, int b, int *out)
-{
-  *out = a + b;
-}
-
 __global__//
 void
 ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w)
@@ -41,7 +34,7 @@ ProcessPowderHip (thrust::universal_vector<thrust::universal_vector<Data>> vec, 
 
   /* Run `do_an_addition` on one block containing one HIP thread. */
 
-  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(1, 2, result_ptr);
+  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(vec, result);
   
   /* Copy result from device to host. This acts as a
      synchronization point, waiting for the kernel dispatch to

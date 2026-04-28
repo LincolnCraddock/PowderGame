@@ -1,7 +1,7 @@
 /*
  * Filename: PowderGame.h
  * Authors:  Lincoln Craddock, John Hershey
- * Date:     2024-04-24
+ * Date:     2024-04-28
  * header file with universal data types for powder rendering
  */
 
@@ -36,5 +36,5 @@ struct Data
   unsigned dy = 0;
 };
 
-extern void
-process_powder (std::vector<std::vector<Data>>& world, std::vector<std::vector<Data>>& newWorld, unsigned H, unsigned W);
+extern std::vector<std::vector<Data>>
+process_powder (std::vector<std::vector<Data>>& world, unsigned H, unsigned W);
