@@ -1,4 +1,7 @@
 main
+mainCuda
+mainHip
+mainMetal
 *.out
 *.o
 *.elf
@@ -7,5 +10,4 @@ main
 *.dSYM/
 *.pdb
 *.d
-*
 Makefile.local
