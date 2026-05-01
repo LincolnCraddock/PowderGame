@@ -10,7 +10,7 @@
 #include <cooperative_groups/reduce.h>
 #include <cuda.h>
 #include <thrust/universal_vector.h>
-
+#include <span>
 
 #include "PowderGame.h"
 
@@ -30,23 +30,15 @@ set_up_processing ()
 }
 
 //pass in the input and output grids, and cast to universal_vector implicitly
-std::vector<Data>
-ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result){
-  //thrust::universal_vector<float> result (1);  
+std::span<Data>
+process_powder(thrust::universal_vector<Data>& vec){
   
+  thrust::universal_vector<Data> result (H * W, { EMPTY, 0 });
   const unsigned NUM_BLOCKS =
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
   ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
   cudaDeviceSynchronize ();
-  return std::vector(result.begin(),result.end());
-}
-
-//wrap the function call
-std::vector<Data>
-process_powder (std::vector<Data>& world)
-{ 
-  std::vector<Data> newWorld (H * W, { EMPTY, 0 });
-  return ProcessPowderCuda(world,newWorld);
+  return std::span(result.data, H * W);
 }
 
 __global__//
@@ -62,7 +54,7 @@ ProcessPowderCudaGPU (Data* const input, Data* result, unsigned h, unsigned w)
   unsigned stride = block.group_dim ().x * gridDim.x;
   for (unsigned i = idx; i < h * w; i += stride){
     Data val = input[i];
-    unsigned y = i%h;
+    unsigned y = i % h;
     switch (val.type)
     {
       case DIRT:
