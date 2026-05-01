@@ -27,8 +27,6 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
 {
     std::vector<Data> newWorld (H * W, { EMPTY, 0 });
 
-    tLast = std::chrono::steady_clock::now ();
-
     /* Create a command buffer and encoder */
     MTL::CommandBuffer* cmdBuf = queue->commandBuffer ();
     MTL::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder ();
@@ -55,9 +53,7 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
     cmdBuf->release ();
 
     /* Read the results from the output buffer, bufC */
-        
-
-  return newWorld;
+    return newWorld;
 }
 
 
@@ -97,10 +93,10 @@ set_up_processing ()
             device Data* result          [[ buffer (1) ]],
             uint2 gid                     [[ thread_position_in_grid ]]
         ) {
-            uint index = gid.y * %i + gid.x;
+            uint index = gid.y + %i * gid.x;
             result[index] = pairs[index].a + pairs[index].b;
         }
-    )", W);
+    )", H);
 
     /* Get a ref to the metal function */
     NS::Error* error = nullptr;
