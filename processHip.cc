@@ -9,7 +9,7 @@
  */
 #include <hip/hip_runtime.h>
 #include <assert.h>
-#include <hip_cooperative_groups.h>
+#include <hip/hip_cooperative_groups.h>
 #include <thrust/universal_vector.h>
 
 #include "PowderGame.h"
@@ -21,55 +21,66 @@ namespace cg = cooperative_groups;
 
 __global__//
 void
-ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w)
+ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w);
 
-__host__//
-void
-ProcessPowderHip (thrust::universal_vector<thrust::universal_vector<Data>> vec, thrust::universal_vector<thrust::universal_vector<Data>> result, unsigned H, unsigned W)
+//pass in the input and output grids, and cast to universal_vector implicitly
+std::vector<Data>
+ProcessPowderHip(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result)
 {
-  int *result_ptr, result;
+  //int *result_ptr, result;
   /* Allocate memory for the device to write the result to. */
-  hipError_t error = hipMalloc(&result_ptr, sizeof(int));
-  assert(error == hipSuccess);
+  //hipError_t error = hipMalloc(&result_ptr, sizeof(int));
+  //assert(error == hipSuccess);
+
+  const unsigned NUM_BLOCKS =
+    (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  //ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
+  
 
   /* Run `do_an_addition` on one block containing one HIP thread. */
 
-  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(vec, result);
+  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(vec.data().get(), result.data().get(), H, W);
   
+  hipDeviceSynchronize ();
+  return std::vector(result.begin(),result.end());
   /* Copy result from device to host. This acts as a
      synchronization point, waiting for the kernel dispatch to
      complete. */
-  error = hipMemcpyDtoH(&result, result_ptr, sizeof(int));
-  assert(error == hipSuccess);
+  // error = hipMemcpyDtoH(&result, result_ptr, sizeof(int));
+  // assert(error == hipSuccess);
 
-  printf("result is %d\n", result);
-  assert(result == 3);
-  return 0;
+  // printf("result is %d\n", result);
+  // assert(result == 3);
+  // return 0;
 }
 
-
+//wrap the function call
+std::vector<Data>
+process_powder (std::vector<Data>& world)
+{ 
+  std::vector<Data> newWorld (H * W, { EMPTY, 0 });
+  return ProcessPowderHip(world,newWorld);
+}
 
 __global__//
 void
 ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w)
 {
-  
   cg::thread_block block = cg::this_thread_block ();
   cg::thread_block_tile<THREADS_PER_WARP> warp = 
   cg::tiled_partition<THREADS_PER_WARP> (block);
   unsigned idx =
-    block.group_index ().x * THREADS_PER_BLOCK + block.thread_index ().x;
+    block.group_index ().x * block.group_dim ().x + block.thread_index ().x;
   unsigned stride = block.group_dim ().x * gridDim.x;
   for (unsigned i = idx; i < h * w; i += stride){
     Data val = input[i];
-    Data next = input[i-w];//plus something
-    unsigned y = idx/w;
+    unsigned y = i % h;
     switch (val.type)
     {
       case DIRT:
       {
-        if (y > 0 && next.type == EMPTY)
-          result[i - w] = {DIRT, 0};
+        if (y > 0 && input[i-1].type == EMPTY)
+          result[i - 1] = {DIRT, 0};
         else
           result[i] = {DIRT, 0};
         break;
@@ -78,12 +89,19 @@ ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w)
       {
         uint32_t dy = 1;
         while (dy <= val.dy + 1 && y >= dy &&
-               input[i- w * dy].type == EMPTY)
+               input[i- dy].type == EMPTY)
           ++dy;
         --dy;
-        result[i - w * dy] = {STONE, dy > 0 ? dy : 0};
+        result[i - dy] = {STONE, dy > 0 ? dy : 0};
         break;
       }
+      case EMPTY:
+        break;
     }
   }
+}
+void
+set_up_processing ()
+{
+  // nothing to set up
 }

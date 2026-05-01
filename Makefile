@@ -48,7 +48,7 @@ ifeq ($(GPU_TYPE),CUDA)
     cudagpu.o: processCuda.cu
 		nvcc $(CUDAFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),HIP)
-    $(info hip)
+    $(info compiling for hip)
     HIPFLAGS = --offload-arch=native -O3
     OBJECTS += hipgpu.o
     MAINCXX := hipcc
@@ -63,7 +63,7 @@ else ifeq ($(GPU_TYPE),HIP)
 		hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
-    METALFLAGS = -std=c++17 -O3
+    METALFLAGS = -std=c++20 -O3
     METAL_FRAMEWORKS = -framework Metal -framework Foundation -framework QuartzCore
     METAL_INCLUDES = -I./metal-cpp  # Add metal-cpp include path if needed
     OBJECTS += metalgpu.o
