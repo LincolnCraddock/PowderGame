@@ -24,20 +24,17 @@ void
 ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w);
 
 //pass in the input and output grids, and cast to universal_vector implicitly
-std::vector<Data>
-ProcessPowderHip(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result)
+std::span<Data>
+process_powder(thrust::universal_vector<Data> vec)
 {
   //int *result_ptr, result;
   /* Allocate memory for the device to write the result to. */
   //hipError_t error = hipMalloc(&result_ptr, sizeof(int));
   //assert(error == hipSuccess);
-
+  thrust::universal_vector<Data> result (H * W, { EMPTY, 0 });
   const unsigned NUM_BLOCKS =
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
   //ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
-  
-
-  /* Run `do_an_addition` on one block containing one HIP thread. */
 
   ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(vec.data().get(), result.data().get(), H, W);
   

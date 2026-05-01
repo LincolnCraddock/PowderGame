@@ -10,7 +10,6 @@
 #include <cooperative_groups/reduce.h>
 #include <cuda.h>
 #include <thrust/universal_vector.h>
-#include <span>
 
 #include "PowderGame.h"
 
@@ -18,27 +17,28 @@ const unsigned THREADS_PER_BLOCK = 256;
 const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
 namespace cg = cooperative_groups;
+thrust::universal_vector<Data> world;
 
 __global__//
 void
 ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
 
-void
-set_up_processing ()
-{
-  // nothing to set up
-}
-
 //pass in the input and output grids, and cast to universal_vector implicitly
 std::span<Data>
-process_powder(thrust::universal_vector<Data>& vec){
+process_powder(){
   
   thrust::universal_vector<Data> result (H * W, { EMPTY, 0 });
   const unsigned NUM_BLOCKS =
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
+  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), result.data().get(), H, W);
   cudaDeviceSynchronize ();
   return std::span(result.data, H * W);
+}
+
+void
+set_up_processing ()
+{
+  world (H * W, {EMPTY, 0});
 }
 
 __global__//
