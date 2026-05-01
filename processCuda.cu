@@ -31,7 +31,7 @@ set_up_processing ()
 
 //pass in the input and output grids, and the size of the grid
 void
-ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result, unsigned H, unsigned W){
+ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result){
   //thrust::universal_vector<float> result (1);  
   
   const unsigned NUM_BLOCKS =
@@ -43,7 +43,7 @@ ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<D
 //#define process_powder(world,  newWorld, H, W) ProcessPowderCuda(world, newWorld, H, W);
 //wrap the function call
 std::vector<Data>
-process_powder (std::vector<Data>& world, unsigned H, unsigned W)
+process_powder (std::vector<Data>& world)
 { 
   std::vector<Data> newWorld (H * W, { EMPTY, 0 });
   //thrust::universal_vector<Data> result (1);

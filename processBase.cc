@@ -9,7 +9,7 @@
 #include "PowderGame.h"
 
 std::vector<Data>
-process_powder (std::vector<Data>& world, unsigned H, unsigned W)
+process_powder (std::vector<Data>& world)
 {
   std::vector<Data> newWorld (
         H * W, { EMPTY, 0 });
@@ -58,7 +58,7 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
   return newWorld;
 }
 
-extern void
+void
 set_up_processing ()
 {
   // nothing to set up
