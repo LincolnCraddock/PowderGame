@@ -102,168 +102,173 @@ main (int argc, char** argv)
   ctx->text_height = text_height;
 
   const int fps = 60;
-  const int64_t frame_budget_ms = 1'000 / fps;
+  // const int64_t frame_budget_ms = 1'000 / fps;
   int mousex = 0, mousey = 0;
   int oldmousex = 0, oldmousey = 0;
 
-  uint8_t brush_size = 1;
+  uint8_t brush_size = 10;
   PowderType powder = DIRT;
   float time_scale = std::atan (tan_time_scale / 10.0f);
   bool isDrawing = false;
 
   int64_t compute_time_ms = 0;
-  int64_t ui_time_ms = 0;
+  // int64_t ui_time_ms = 0;
 
   /* main loop */
   int64_t time_of_last_compute = r_get_time ();
+  int64_t time_of_last_ui = r_get_time ();
   for (;;)
   {
     int64_t ui_before = r_get_time ();
 
-    /* process user input */
-    oldmousex = mousex;
-    oldmousey = mousey;
-    if (r_mouse_moved (&mousex, &mousey))
+    if (ui_before - time_of_last_ui > 1000 / fps)
     {
-      mu_input_mousemove (ctx, mousex, mousey);
-    }
-    if (r_mouse_down ())
-    {
-      mu_input_mousedown (ctx, mousex, mousey, MU_MOUSE_LEFT);
-      if (!ctx->hover_root)
-        isDrawing = true;
-    }
-    else if (r_mouse_up ())
-    {
-      mu_input_mouseup (ctx, mousex, mousey, MU_MOUSE_LEFT);
-      isDrawing = false;
-    }
-    // from claude
-    if (isDrawing)
-    {
-      int cy = H - mousey - 1, cx = mousex;
-      int oy = H - oldmousey - 1, ox = oldmousex;
-      int dx = std::abs (cx - ox), dy = std::abs (cy - oy);
-      int sx = ox < cx ? 1 : -1, sy = oy < cy ? 1 : -1;
-      int err = dx - dy;
-      auto drawCircle = [&] (int px, int py)
+      /* process user input */
+      oldmousex = mousex;
+      oldmousey = mousey;
+      if (r_mouse_moved (&mousex, &mousey))
       {
-        if (brush_size == 1)
-        {
-          if (py >= 0 && (size_t) py < H && px >= 0 && (size_t) px < W)
-            world[py + px * H] = { powder, 0 };
-          return;
-        }
-        int x = 0, y = brush_size - 1, d = -brush_size;
-        auto fillRow = [&] (int row, int x0, int x1)
-        {
-          if (row < 0 || (size_t) row >= H)
-            return;
-          for (int i = std::max (0, x0); i <= std::min ((int) W - 1, x1); i++)
-            world[row + i * H] = { powder, 0 };
-        };
-        fillRow (py, px - brush_size - 1, px + brush_size - 1);
-        while (x < y)
-        {
-          x++;
-          d += d < 0 ? 2 * x + 1 : 2 * (x - y--) + 1;
-          fillRow (py + y, px - x, px + x);
-          fillRow (py - y, px - x, px + x);
-          fillRow (py + x, px - y, px + y);
-          fillRow (py - x, px - y, px + y);
-        }
-      };
-      while (true)
-      {
-        drawCircle (ox, oy);
-        if (ox == cx && oy == cy)
-          break;
-        int e2 = 2 * err;
-        if (e2 > -dy)
-        {
-          err -= dy;
-          ox += sx;
-        }
-        if (e2 < dx)
-        {
-          err += dx;
-          oy += sy;
-        }
+        mu_input_mousemove (ctx, mousex, mousey);
       }
-    }
-
-    if (r_key_down (0x1b))
-    {
-      break;
-    } // esc
-    if (r_key_down ('\n'))
-    {
-      mu_input_keydown (ctx, MU_KEY_RETURN);
-    }
-    else if (r_key_up ('\n'))
-    {
-      mu_input_keyup (ctx, MU_KEY_RETURN);
-    }
-    if (r_key_down ('\b'))
-    {
-      mu_input_keydown (ctx, MU_KEY_BACKSPACE);
-    }
-    else if (r_key_up ('\b'))
-    {
-      mu_input_keyup (ctx, MU_KEY_BACKSPACE);
-    }
-    for (char i : std::views::iota (0, 256))
-    {
-      if (r_key_down (i))
+      if (r_mouse_down ())
       {
-        if (' ' <= i && i <= '~')
+        mu_input_mousedown (ctx, mousex, mousey, MU_MOUSE_LEFT);
+        if (!ctx->hover_root)
+          isDrawing = true;
+      }
+      else if (r_mouse_up ())
+      {
+        mu_input_mouseup (ctx, mousex, mousey, MU_MOUSE_LEFT);
+        isDrawing = false;
+      }
+      // from claude
+      if (isDrawing)
+      {
+        int cy = H - mousey - 1, cx = mousex;
+        int oy = H - oldmousey - 1, ox = oldmousex;
+        int dx = std::abs (cx - ox), dy = std::abs (cy - oy);
+        int sx = ox < cx ? 1 : -1, sy = oy < cy ? 1 : -1;
+        int err = dx - dy;
+        auto drawCircle = [&] (int px, int py)
         {
-          char text[2] = { i, 0 };
-          if (isalpha (i))
+          if (brush_size == 1)
           {
-            if (!r_shift_pressed ())
-            {
-              text[0] = tolower (i);
-            }
+            if (py >= 0 && (size_t) py < H && px >= 0 && (size_t) px < W)
+              world[py + px * H] = { powder, 0 };
+            return;
           }
-          mu_input_text (ctx, text);
+          int x = 0, y = brush_size - 1, d = -brush_size;
+          auto fillRow = [&] (int row, int x0, int x1)
+          {
+            if (row < 0 || (size_t) row >= H)
+              return;
+            for (int i = std::max (0, x0); i <= std::min ((int) W - 1, x1); i++)
+              world[row + i * H] = { powder, 0 };
+          };
+          fillRow (py, px - brush_size - 1, px + brush_size - 1);
+          while (x < y)
+          {
+            x++;
+            d += d < 0 ? 2 * x + 1 : 2 * (x - y--) + 1;
+            fillRow (py + y, px - x, px + x);
+            fillRow (py - y, px - x, px + x);
+            fillRow (py + x, px - y, px + y);
+            fillRow (py - x, px - y, px + y);
+          }
+        };
+        while (true)
+        {
+          drawCircle (ox, oy);
+          if (ox == cx && oy == cy)
+            break;
+          int e2 = 2 * err;
+          if (e2 > -dy)
+          {
+            err -= dy;
+            ox += sx;
+          }
+          if (e2 < dx)
+          {
+            err += dx;
+            oy += sy;
+          }
         }
-        continue;
       }
-    }
 
-    /* process next ui frame */
-    process_frame (ctx, &brush_size, &powder, &time_scale, compute_time_ms);
-
-    /* render */
-    r_clear (mu_color (bg[0], bg[1], bg[2], 255));
-    render_powder ();
-    mu_Command* cmd = NULL;
-    while (mu_next_command (ctx, &cmd))
-    {
-      switch (cmd->type)
+      if (r_key_down (0x1b))
       {
-        case MU_COMMAND_TEXT:
-          r_draw_text (cmd->text.str, cmd->text.pos, cmd->text.color);
-          break;
-        case MU_COMMAND_RECT:
-          r_draw_rect (cmd->rect.rect, cmd->rect.color);
-          break;
-        case MU_COMMAND_ICON:
-          r_draw_icon (cmd->icon.id, cmd->icon.rect, cmd->icon.color);
-          break;
-        case MU_COMMAND_CLIP:
-          r_set_clip_rect (cmd->clip.rect);
-          break;
+        break;
+      } // esc
+      if (r_key_down ('\n'))
+      {
+        mu_input_keydown (ctx, MU_KEY_RETURN);
       }
-    }
-    r_present ();
+      else if (r_key_up ('\n'))
+      {
+        mu_input_keyup (ctx, MU_KEY_RETURN);
+      }
+      if (r_key_down ('\b'))
+      {
+        mu_input_keydown (ctx, MU_KEY_BACKSPACE);
+      }
+      else if (r_key_up ('\b'))
+      {
+        mu_input_keyup (ctx, MU_KEY_BACKSPACE);
+      }
+      for (char i : std::views::iota (0, 256))
+      {
+        if (r_key_down (i))
+        {
+          if (' ' <= i && i <= '~')
+          {
+            char text[2] = { i, 0 };
+            if (isalpha (i))
+            {
+              if (!r_shift_pressed ())
+              {
+                text[0] = tolower (i);
+              }
+            }
+            mu_input_text (ctx, text);
+          }
+          continue;
+        }
+      }
 
-    int64_t ui_after = r_get_time ();
-    ui_time_ms = ui_after - ui_before;
+      /* process next ui frame */
+      process_frame (ctx, &brush_size, &powder, &time_scale, compute_time_ms);
+
+      /* render */
+      r_clear (mu_color (bg[0], bg[1], bg[2], 255));
+      render_powder ();
+      mu_Command* cmd = NULL;
+      while (mu_next_command (ctx, &cmd))
+      {
+        switch (cmd->type)
+        {
+          case MU_COMMAND_TEXT:
+            r_draw_text (cmd->text.str, cmd->text.pos, cmd->text.color);
+            break;
+          case MU_COMMAND_RECT:
+            r_draw_rect (cmd->rect.rect, cmd->rect.color);
+            break;
+          case MU_COMMAND_ICON:
+            r_draw_icon (cmd->icon.id, cmd->icon.rect, cmd->icon.color);
+            break;
+          case MU_COMMAND_CLIP:
+            r_set_clip_rect (cmd->clip.rect);
+            break;
+        }
+      }
+      r_present ();
+
+      // int64_t ui_after = r_get_time ();
+      // ui_time_ms = ui_after - ui_before;
+    }
+
     int64_t compute_before = r_get_time ();
 
-    int64_t sleep_time_ms = frame_budget_ms - ui_time_ms;
+    // int64_t sleep_time_ms = frame_budget_ms - ui_time_ms;
 
     // compute frames at a rate set by time_scale
     if (compute_before - time_of_last_compute > 1000 / tan_time_scale)
@@ -273,13 +278,13 @@ main (int argc, char** argv)
       world = process_powder ();
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
-      sleep_time_ms -= compute_time_ms;
+      // sleep_time_ms -= compute_time_ms;
     }
 
-    if (sleep_time_ms > 0)
-    {
-      r_sleep (sleep_time_ms);
-    }
+    // if (sleep_time_ms > 0)
+    // {
+    //   r_sleep (sleep_time_ms);
+    // }
   }
 
   return 0;
