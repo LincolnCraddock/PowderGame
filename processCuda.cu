@@ -29,8 +29,8 @@ set_up_processing ()
   // nothing to set up
 }
 
-//pass in the input and output grids, and the size of the grid
-void
+//pass in the input and output grids, and cast to universal_vector implicitly
+std::vector<Data>
 ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result){
   //thrust::universal_vector<float> result (1);  
   
@@ -38,20 +38,15 @@ ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<D
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
   ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
   cudaDeviceSynchronize ();
+  return std::vector(result.begin(),result.end());
 }
 
-//#define process_powder(world,  newWorld, H, W) ProcessPowderCuda(world, newWorld, H, W);
 //wrap the function call
 std::vector<Data>
 process_powder (std::vector<Data>& world)
 { 
   std::vector<Data> newWorld (H * W, { EMPTY, 0 });
-  //thrust::universal_vector<Data> result (1);
-  //std::vector<std::vector<Data>> temp23 (world.begin(), world.end());
-  //thrust::universal_vector<std::vector<Data>> tests (world.begin(), world.end());
-  //thrust::universal_vector<thrust::universal_vector<Data>> test2 = newWorld;    
-  ProcessPowderCuda(world,newWorld, H, W);
-  return newWorld;
+  return ProcessPowderCuda(world,newWorld);
 }
 
 __global__//
@@ -63,18 +58,17 @@ ProcessPowderCudaGPU (Data* const input, Data* result, unsigned h, unsigned w)
   cg::thread_block_tile<THREADS_PER_WARP> warp = 
   cg::tiled_partition<THREADS_PER_WARP> (block);
   unsigned idx =
-    block.group_index ().x * THREADS_PER_BLOCK + block.thread_index ().x;
+    block.group_index ().x * block.group_dim ().x + block.thread_index ().x;
   unsigned stride = block.group_dim ().x * gridDim.x;
   for (unsigned i = idx; i < h * w; i += stride){
     Data val = input[i];
-    Data next = input[i-w];//plus something
-    unsigned y = idx/w;
+    unsigned y = i%h;
     switch (val.type)
     {
       case DIRT:
       {
-        if (y > 0 && next.type == EMPTY)
-          result[i - w] = {DIRT, 0};
+        if (y > 0 && input[i-1].type == EMPTY)
+          result[i - 1] = {DIRT, 0};
         else
           result[i] = {DIRT, 0};
         break;
@@ -83,10 +77,10 @@ ProcessPowderCudaGPU (Data* const input, Data* result, unsigned h, unsigned w)
       {
         uint32_t dy = 1;
         while (dy <= val.dy + 1 && y >= dy &&
-               input[i- w * dy].type == EMPTY)
+               input[i- dy].type == EMPTY)
           ++dy;
         --dy;
-        result[i - w * dy] = {STONE, dy > 0 ? dy : 0};
+        result[i - dy] = {STONE, dy > 0 ? dy : 0};
         break;
       }
     }
