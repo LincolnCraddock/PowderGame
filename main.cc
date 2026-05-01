@@ -29,6 +29,12 @@ extern "C"
 #include "metal-cpp/Metal/Metal.hpp"
 #endif
 
+#if defined METAL
+#define NS_PRIVATE_IMPLEMENTATION
+#define MTL_PRIVATE_IMPLEMENTATION
+#include "metal-cpp/Metal/Metal.hpp"
+#endif
+
 #include "PowderGame.h"
 
 size_t W = 1000;
@@ -118,98 +124,82 @@ main (int argc, char** argv)
 
 #if defined METAL
   /* Find a GPU */
-  MTL::Device* device = MTL::CreateSystemDefaultDevice ();
-  if (!device)
-  {
-    std::cerr << "Metal not supported" << std::endl;
-    return 1;
-  }
-  std::cout << "Using GPU: " << device->name ()->utf8String () << "\n";
+    MTL::Device* device = MTL::CreateSystemDefaultDevice();
+    if (!device)
+    {
+        std::cerr << "Metal not supported" << std::endl;
+        return 1;
+    }
 
-  if (device->supportsFamily (MTL::GPUFamilyMetal4))
-    std::cout << "Supports Metal 4!" << std::endl;
-  else if (device->supportsFamily (MTL::GPUFamilyMetal3))
-    std::cout << "Only supports Metal 3..." << std::endl;
+    /* Metal function */
+    char shaderSrc[1024];
+    snprintf(shaderSrc, 1024, R"(
+        #include <metal_stdlib>
+        using namespace metal;
 
-  /* Metal function */
-  const char* shaderSrc = R"(
-#include <metal_stdlib>
-using namespace metal;
+        struct floatPair
+        {
+            float a;
+            float b;
+        };
 
-struct Data
-{
-PowderType type = EMPTY;
-uint32_t dy = 0;
-};
+        kernel void add_pairs (
+            device const floatPair* pairs [[ buffer (0) ]],
+            device float* result          [[ buffer (1) ]],
+            uint2 gid                     [[ thread_position_in_grid ]]
+        ) {
+            uint index = gid.y * %i + gid.x;
+            result[index] = pairs[index].a + pairs[index].b;
+        }
+    )"), W);
 
-kernel void process_powder (
-device const Data* world [[ buffer (0) ]],
-device Data* newWorld [[ buffer (1) ]],
-uint index [[ thread_position_in_grid ]]
-) {
-// TODO
-newWorld[index] = world[index];
-}
-)";
+    /* Get a ref to the metal function */
+    NS::Error* error = nullptr;
+    NS::String* src = NS::String::string(shaderSrc, NS::UTF8StringEncoding);
+    MTL::CompileOptions* opts = MTL::CompileOptions::alloc ()->init ();
+    MTL::Library* library = device->newLibrary (src, opts, &error);
+    if (!library)
+    {
+        std::cerr << "Shader error: " << error->localizedDescription ()->utf8String () << std::endl;
+        return 1;
+    }
 
-  /* Get a ref to the metal function */
-  NS::Error* error = nullptr;
-  NS::String* src = NS::String::string (shaderSrc, NS::UTF8StringEncoding);
-  MTL::CompileOptions* opts = MTL::CompileOptions::alloc ()->init ();
-  MTL::Library* library = device->newLibrary (src, opts, &error);
-  if (!library)
-  {
-    std::cerr << "Shader error: "
-              << error->localizedDescription ()->utf8String () << std::endl;
-    return 1;
-  }
+    /* Prepare a metal pipeline */
+    NS::String* fnName = NS::String::string ("add_pairs", NS::UTF8StringEncoding);
+    MTL::Function* function = library->newFunction (fnName);
+    // A 'compute' pipeline runs a single 'compute' function
+    MTL::ComputePipelineState* pipeline = device->newComputePipelineState (function, &error);
+    if (!pipeline)
+    {
+        std::cerr << "Pipeline error: " << error->localizedDescription ()->utf8String () << std::endl;
+        return 1;
+    }
 
-  /* Prepare a metal pipeline */
-  NS::String* fnName =
-    NS::String::string ("process_powder", NS::UTF8StringEncoding);
-  MTL::Function* function = library->newFunction (fnName);
-  // A 'compute' pipeline runs a single 'compute' function
-  MTL::ComputePipelineState* pipeline =
-    device->newComputePipelineState (function, &error);
+    /* Create data buffers and load data into them */
+    const size_t count = W * H;
+    const size_t inputBufferSize  = count * sizeof(floatPair);
+    const size_t outputBufferSize = count * sizeof(float);
 
-  /* Create data buffers and load data into them */
-  const uint count = 16;
-  const size_t bufferSize = count * sizeof (Data);
+    std::vector<floatPair> pairs (count);
+    for (size_t y = 0; y < H; ++y)
+        for (size_t x = 0; x < W; ++x)
+        {
+            size_t i      = y * W + x;
+            pairs[i].a  = float(i);
+            pairs[i].b  = float(i * 2);
+        }
 
-  MTL::Buffer* worldBuf = device->newBuffer (
-    world.data (), bufferSize, MTL::ResourceStorageModeShared);
-  // TODO: call a method to fill the data, not this
-  std::vector<std::vector<Data>> newWorld (H,
-                                           std::vector<Data> (W, { EMPTY, 0 }));
-  MTL::Buffer* newWorldBuf = device->newBuffer (
-    newWorld.data (), bufferSize, MTL::ResourceStorageModeShared);
+    MTL::Buffer* bufPairs = device->newBuffer (pairs.data (), inputBufferSize,  MTL::ResourceStorageModeShared);
+    MTL::Buffer* bufC     = device->newBuffer (outputBufferSize, MTL::ResourceStorageModeShared);
 
-  /* Create descriptors */
-  MTL4::CommandQueueDescriptor* queueDesc =
-    MTL4::CommandQueueDescriptor::alloc ()->init ();
-  MTL4::CommandAllocatorDescriptor* allocDesc =
-    MTL4::CommandAllocatorDescriptor::alloc ()->init ();
-  MTL4::ArgumentTableDescriptor* tableDesc =
-    MTL4::ArgumentTableDescriptor::alloc ()->init ();
-  tableDesc->setMaxBufferBindCount (2);
+    /* Calculate the maximum threads per threadgroup based on the thread execution width */
+    NS::UInteger w            = pipeline->threadExecutionWidth ();
+    NS::UInteger h            = pipeline->maxTotalThreadsPerThreadgroup () / w;
+    MTL::Size threadsPerGroup = MTL::Size (w, h, 1);
+    MTL::Size threadsPerGrid  = MTL::Size (W, H, 1);
 
-  /* Create a command queue, allocator, buffer, and argument table from
-   * descriptors */
-  MTL4::CommandQueue* queue = device->newMTL4CommandQueue (queueDesc, &error);
-  MTL4::CommandAllocator* allocator =
-    device->newCommandAllocator (allocDesc, &error);
-  MTL4::CommandBuffer* cmdBuf = device->newCommandBuffer ();
-  MTL4::ArgumentTable* argTable = device->newArgumentTable (tableDesc, &error);
-
-  /* Give the argument table access to data */
-  // the indices (0 and 1) represent the paramaters the buffers supply
-  argTable->setAddress (worldBuf->gpuAddress (), 0);
-  argTable->setAddress (newWorldBuf->gpuAddress (), 1);
-
-  /* Create a shared event */
-  MTL::SharedEvent* frameCompletionEvent = device->newSharedEvent ();
-  uint64_t frameIdx = 0;
-  frameCompletionEvent->setSignaledValue (frameIdx);
+    /* Create a command queue */
+    MTL::CommandQueue* queue = device->newCommandQueue ();
 #endif
 
   int64_t compute_time_ms = 0;
@@ -370,51 +360,12 @@ newWorld[index] = world[index];
     if (compute_before - time_of_last_compute > 1000 / tan_time_scale)
     {
       time_of_last_compute = compute_before;
-/* compute a timestep in the powder simulation */
+      /* compute a timestep in the powder simulation */
 #if defined METAL
-      /* Wait for GPU to finish to begin next frame*/
-      frameCompletionEvent->waitUntilSignaledValue (
-        frameIdx - 1, /* timeout milliseconds = */ 1000);
-      ++frameIdx;
-
-      /* Create a command encoder that reuses the allocator */
-      allocator->reset ();
-      cmdBuf->beginCommandBuffer (allocator);
-      MTL4::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder ();
-
-      /* Write data in the argument table to the buffer via the encoder */
-      encoder->setArgumentTable (argTable);
-
-      /* Write commands to the buffer via the encoder */
-      encoder->setComputePipelineState (pipeline);
-
-      // count × 1 × 1 grid of threads
-      // TODO: 2D
-      MTL::Size threadsPerGrid = MTL::Size (count, 1, 1);
-      NS::UInteger maxThreads = pipeline->maxTotalThreadsPerThreadgroup ();
-      if (maxThreads > count)
-        maxThreads = count;
-      MTL::Size threadsPerGroup = MTL::Size (maxThreads, 1, 1);
-      encoder->dispatchThreads (threadsPerGrid, threadsPerGroup);
-      encoder->endEncoding ();
-      cmdBuf->endCommandBuffer ();
-
-      // /* Finally, run the commands encoded in the command buffer on the GPU
-      // */ cmdBuf->commit ();
-
-      /* Finally, run the commands encoded in the command buffer on the GPU */
-      MTL4::CommitOptions* commitOpts = MTL4::CommitOptions::alloc ()->init ();
-      queue->commit (&cmdBuf, 1, commitOpts);
-      commitOpts->release ();
-
-      // /* Wait until the commands have finished */
-      // cmdBuf->waitUntilCompleted ();
-
-      /* Wait until the commands have finished */
-      queue->signalEvent (frameCompletionEvent, frameIdx);
+      
+#else
+      world = process_powder (world, H, W);
 #endif
-      std::vector<Data> newWorld = process_powder (world, H, W);
-      world = newWorld;
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
       sleep_time_ms -= compute_time_ms;
@@ -791,12 +742,13 @@ void
 render_powder ()
 {
   struct fenster* wnd = r_get_underlying ();
-  for (size_t y = 0; y < H; ++y)
+  for (size_t x = 0; x < W; ++x)
   {
-    for (size_t x = 0; x < W; ++x)
+    for (size_t y = 0; y < H; ++y)
     {
       fenster_pixel (wnd, x, H - y - 1) =
-        r_color (powderColors[world[y][x].type]);
+        r_color (powderColors[world[y + x * H].type]);
     }
   }
 }
+

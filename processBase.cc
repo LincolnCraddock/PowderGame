@@ -13,15 +13,15 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
 {
   std::vector<Data> newWorld (
         H * W, { EMPTY, 0 });
-  for (size_t y = 0; y < H; ++y)
+  for (size_t x = 0; x < W; ++x)
   {
-    for (size_t x = 0; x < W; ++x)
+    for (size_t y = 0; y < H; ++y)
     {
       switch (world[y + x * H].type)
       {
         case DIRT:
         {
-          if (y > 0 && world[y - 1 +x * H].type == EMPTY)
+          if (y > 0 && world[y - 1 + x * H].type == EMPTY)
           {
             newWorld[y - 1 + x * H] = { DIRT, 0 };
           }
