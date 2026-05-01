@@ -15,7 +15,6 @@
         },
         {
             "name": "Build with makefile and debug active file",
-            "type": "lldb",
             "request": "launch",
             "program": "${fileDirname}/${fileBasenameNoExtension}",
             "args": ["--size", "1200,", "1000"],

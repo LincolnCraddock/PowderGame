@@ -63,18 +63,25 @@ else ifeq ($(GPU_TYPE),HIP)
 		hipcc $(HIPFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),METAL)
     $(info metal)
-    METALFLAGS = -O3 #fix
+    METALFLAGS = -std=c++17 -O3
+    METAL_FRAMEWORKS = -framework Metal -framework Foundation -framework QuartzCore
+    METAL_INCLUDES = -I./metal-cpp  # Add metal-cpp include path if needed
     OBJECTS += metalgpu.o
-    MAINCXX := metal #fix
+    MAINCXX := clang++
     ifeq ($(MAIN), main.exe)
         MAIN:=mainMetal.exe
     else
         MAIN:=mainMetal
     endif
+    # Override LDLIBS for Metal build (preserve existing libs)
+    LDLIBS := $(LDLIBS) $(METAL_FRAMEWORKS)
+    # Add Metal-specific CXXFLAGS
+    CXXFLAGS := $(CXXFLAGS) $(METAL_INCLUDES)
+    
     all: metalgpu.o $(MAIN)
     
     metalgpu.o: processMetal.cc
-		metal $(METALFLAGS) -c $< -o $@ #fix
+		$(MAINCXX) $(CXXFLAGS) $(METALFLAGS) -c $< -o $@
 else
     OBJECTS += processBase.o
 endif

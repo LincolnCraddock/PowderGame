@@ -15,71 +15,86 @@
 
 #include <iostream>
 
-MTL::CommandQueue* queue;
-MTL::ComputePipelineState* pipeline;
-MTL::Buffer* bufWorld;
-MTL::Buffer* bufNewWorld;
-MTL::Size threadsPerGroup;
-MTL::Size threadsPerGrid;
+// Make these global or static so they persist
+static MTL::Device* device = nullptr;
+static MTL::CommandQueue* queue = nullptr;
+static MTL::ComputePipelineState* pipeline = nullptr;
+static MTL::Buffer* bufWorld = nullptr;
+static MTL::Buffer* bufNewWorld = nullptr;
+static MTL::Size threadsPerGroup;
+static MTL::Size threadsPerGrid;
+
+// Forward declaration
+void set_up_processing();
 
 std::vector<Data>
-process_powder (std::vector<Data>& world, unsigned H, unsigned W)
-{
-    Data* bufWorldPtr = (Data*)bufWorld->contents ();
-    Data* bufNewWorldPtr = (Data*)bufNewWorld->contents ();
+process_powder (std::vector<Data>& world)
+{    
+    Data* bufWorldPtr = (Data*)bufWorld->contents();
+    Data* bufNewWorldPtr = (Data*)bufNewWorld->contents();
+    
+    // Copy input data to GPU buffer
     for (uint y = 0; y < H; ++y)
         for (uint x = 0; x < W; ++x)
         {
-            uint i           = y * W + x;
+            uint i = y * W + x;
             bufWorldPtr[i] = world[i];
             bufNewWorldPtr[i] = { EMPTY, 0 };
         }
 
     /* Create a command buffer and encoder */
-    MTL::CommandBuffer* cmdBuf = queue->commandBuffer ();
-    MTL::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder ();
+    MTL::CommandBuffer* cmdBuf = queue->commandBuffer();
+    if (!cmdBuf) {
+        std::cerr << "Failed to create command buffer" << std::endl;
+        return world;
+    }
+    
+    MTL::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder();
+    if (!encoder) {
+        std::cerr << "Failed to create compute encoder" << std::endl;
+        cmdBuf->release();
+        return world;
+    }
 
     /* Write commands to the buffer via the encoder */
-    encoder->setComputePipelineState (pipeline);
+    encoder->setComputePipelineState(pipeline);
 
     /* Write data to the buffer via the encoder */
-    // the indices (0 and 1) represent the parameters the buffers supply
-    // the offsets (all 0s) are for if you only want one element of an array to be supplied
-    encoder->setBuffer (bufWorld, 0, 0);
-    encoder->setBuffer (bufNewWorld, 0, 1);
+    encoder->setBuffer(bufWorld, 0, 0);
+    encoder->setBuffer(bufNewWorld, 0, 1);
 
     // W × H grid of threads, one per cell
-    encoder->dispatchThreads (threadsPerGrid, threadsPerGroup);
-    encoder->endEncoding ();
-    encoder->release ();
+    encoder->dispatchThreads(threadsPerGrid, threadsPerGroup);
+    encoder->endEncoding();
 
     /* Finally, run the commands encoded in the command buffer on the GPU */
-    cmdBuf->commit ();
+    cmdBuf->commit();
 
     /* Wait until the commands have finished */
-    cmdBuf->waitUntilCompleted ();
-    cmdBuf->release ();
-
+    cmdBuf->waitUntilCompleted();
+    
     /* Return the results from the output buffer */
-    std::vector<Data> newWorld (bufNewWorldPtr, bufNewWorldPtr + H * W);
+    std::vector<Data> newWorld(bufNewWorldPtr, bufNewWorldPtr + H * W);
+    
+    cmdBuf->release();
+    
     return newWorld;
 }
 
-
-extern void
+void
 set_up_processing ()
-{
+{    
     /* Find a GPU */
-    MTL::Device* device = MTL::CreateSystemDefaultDevice();
+    device = MTL::CreateSystemDefaultDevice();
     if (!device)
     {
         std::cerr << "Metal not supported" << std::endl;
         return;
     }
-
+    
     /* Metal function */
-    char shaderSrc[1024];
-    snprintf(shaderSrc, 1024, R"(
+    char shaderSrc[10'000];
+    snprintf(shaderSrc, 10'000, R"(
         #include <metal_stdlib>
         using namespace metal;
 
@@ -92,9 +107,9 @@ set_up_processing ()
 
         struct Data
         {
-        PowderType type = EMPTY;
-        // only computed for stone
-        unsigned dy = 0;
+            PowderType type = EMPTY;
+            // only computed for stone
+            unsigned dy = 0;
         };
 
         kernel void process_powder (
@@ -120,8 +135,7 @@ set_up_processing ()
                 case STONE:
                 {
                     unsigned dy = 1;
-                    while (dy <= data[idx].dy + 1 && gid.y >= dy &&
-                           data[idx - dy].type == EMPTY)
+                    while (dy <= data[idx].dy + 1 && gid.y >= dy && data[idx - dy].type == EMPTY)
                         ++dy;
                     --dy;
                     if (dy > 0)
@@ -133,47 +147,81 @@ set_up_processing ()
                         result[idx] = { STONE, 0 };
                     }
                     break;
+                } 
+                default:
+                {
+                    ;// nothing
                 }
             }
         }
-    )", H);
+    )", (int)H);
 
     /* Get a ref to the metal function */
     NS::Error* error = nullptr;
     NS::String* src = NS::String::string(shaderSrc, NS::UTF8StringEncoding);
-    MTL::CompileOptions* opts = MTL::CompileOptions::alloc ()->init ();
-    MTL::Library* library = device->newLibrary (src, opts, &error);
+    MTL::CompileOptions* opts = MTL::CompileOptions::alloc()->init();
+    if (!opts) {
+        std::cerr << "Failed to create compile options" << std::endl;
+        return;
+    }
+    
+    MTL::Library* library = device->newLibrary(src, opts, &error);
+    opts->release();
+    
     if (!library)
     {
-        std::cerr << "Shader error: " << error->localizedDescription ()->utf8String () << std::endl;
+        std::cerr << "Shader error: " << (error ? error->localizedDescription()->utf8String() : "unknown") << std::endl;
+        if (error) error->release();
         return;
     }
-
+    
     /* Prepare a metal pipeline */
-    NS::String* fnName = NS::String::string ("process_powder", NS::UTF8StringEncoding);
-    MTL::Function* function = library->newFunction (fnName);
+    NS::String* fnName = NS::String::string("process_powder", NS::UTF8StringEncoding);
+    MTL::Function* function = library->newFunction(fnName);
+    fnName->release();
+    
+    if (!function) {
+        std::cerr << "Failed to get function from library" << std::endl;
+        library->release();
+        return;
+    }
+    
     // A 'compute' pipeline runs a single 'compute' function
-    MTL::ComputePipelineState* pipeline = device->newComputePipelineState (function, &error);
+    pipeline = device->newComputePipelineState(function, &error);
+    function->release();
+    
     if (!pipeline)
     {
-        std::cerr << "Pipeline error: " << error->localizedDescription ()->utf8String () << std::endl;
+        std::cerr << "Pipeline error: " << (error ? error->localizedDescription()->utf8String() : "unknown") << std::endl;
+        if (error) error->release();
+        library->release();
         return;
     }
+    library->release();
 
     /* Create data buffers and load data into them */
     const size_t count = W * H;
-    const size_t inputBufferSize  = count * sizeof(Data);
-    const size_t outputBufferSize = count * sizeof(Data);
+    const size_t bufferSize = count * sizeof(Data);
 
-    bufWorld = device->newBuffer (inputBufferSize,  MTL::ResourceStorageModeShared);
-    bufNewWorld = device->newBuffer (outputBufferSize, MTL::ResourceStorageModeShared);
-
+    bufWorld = device->newBuffer(bufferSize, MTL::ResourceStorageModeShared);
+    bufNewWorld = device->newBuffer(bufferSize, MTL::ResourceStorageModeShared);
+    
+    if (!bufWorld || !bufNewWorld) {
+        std::cerr << "Failed to create buffers" << std::endl;
+        return;
+    }
+    
     /* Calculate the maximum threads per threadgroup based on the thread execution width */
-    NS::UInteger w            = pipeline->threadExecutionWidth ();
-    NS::UInteger h            = pipeline->maxTotalThreadsPerThreadgroup () / w;
-    MTL::Size threadsPerGroup = MTL::Size (w, h, 1);
-    MTL::Size threadsPerGrid  = MTL::Size (W, H, 1);
+    NS::UInteger w = pipeline->threadExecutionWidth();
+    NS::UInteger h = pipeline->maxTotalThreadsPerThreadgroup() / w;
+    threadsPerGroup = MTL::Size(w, h, 1);
+    threadsPerGrid = MTL::Size(W, H, 1);
+
 
     /* Create a command queue */
-    queue = device->newCommandQueue ();
+    queue = device->newCommandQueue();
+    if (!queue) {
+        std::cerr << "Failed to create command queue" << std::endl;
+        return;
+    }
 }
