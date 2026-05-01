@@ -23,6 +23,12 @@ __global__//
 void
 ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
 
+void
+set_up_processing ()
+{
+  // nothing to set up
+}
+
 //pass in the input and output grids, and the size of the grid
 void
 ProcessPowderCuda(thrust::universal_vector<Data> vec, thrust::universal_vector<Data> result, unsigned H, unsigned W){
