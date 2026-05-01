@@ -25,7 +25,7 @@ ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
 
 //pass in the input and output grids, and cast to universal_vector implicitly
 std::span<Data>
-process_powder(thrust::universal_vector<Data>& vec){
+process_powder(){
   
   thrust::universal_vector<Data> result (H * W, { EMPTY, 0 });
   const unsigned NUM_BLOCKS =
