@@ -17,15 +17,23 @@
 
 MTL::CommandQueue* queue;
 MTL::ComputePipelineState* pipeline;
-MTL::Buffer* bufPairs;
-MTL::Buffer* bufC;
+MTL::Buffer* bufWorld;
+MTL::Buffer* bufNewWorld;
 MTL::Size threadsPerGroup;
 MTL::Size threadsPerGrid;
 
 std::vector<Data>
 process_powder (std::vector<Data>& world, unsigned H, unsigned W)
 {
-    std::vector<Data> newWorld (H * W, { EMPTY, 0 });
+    Data* bufWorldPtr = (Data*)bufWorld->contents ();
+    Data* bufNewWorldPtr = (Data*)bufNewWorld->contents ();
+    for (uint y = 0; y < H; ++y)
+        for (uint x = 0; x < W; ++x)
+        {
+            uint i           = y * W + x;
+            bufWorldPtr[i] = world[i];
+            bufNewWorldPtr[i] = { EMPTY, 0 };
+        }
 
     /* Create a command buffer and encoder */
     MTL::CommandBuffer* cmdBuf = queue->commandBuffer ();
@@ -37,8 +45,8 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
     /* Write data to the buffer via the encoder */
     // the indices (0 and 1) represent the parameters the buffers supply
     // the offsets (all 0s) are for if you only want one element of an array to be supplied
-    encoder->setBuffer (bufPairs, 0, 0);
-    encoder->setBuffer (bufC,     0, 1);
+    encoder->setBuffer (bufWorld, 0, 0);
+    encoder->setBuffer (bufNewWorld, 0, 1);
 
     // W × H grid of threads, one per cell
     encoder->dispatchThreads (threadsPerGrid, threadsPerGroup);
@@ -52,7 +60,8 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
     cmdBuf->waitUntilCompleted ();
     cmdBuf->release ();
 
-    /* Read the results from the output buffer, bufC */
+    /* Return the results from the output buffer */
+    std::vector<Data> newWorld (bufNewWorldPtr, bufNewWorldPtr + H * W);
     return newWorld;
 }
 
@@ -88,13 +97,44 @@ set_up_processing ()
         unsigned dy = 0;
         };
 
-        kernel void add_pairs (
+        kernel void process_powder (
             device const Data* data [[ buffer (0) ]],
-            device Data* result          [[ buffer (1) ]],
-            uint2 gid                     [[ thread_position_in_grid ]]
+            device Data* result     [[ buffer (1) ]],
+            uint2 gid               [[ thread_position_in_grid ]]
         ) {
-            uint index = gid.y + %i * gid.x;
-            result[index] = pairs[index].a + pairs[index].b;
+            uint idx = gid.y + %i * gid.x;
+            switch (data[idx].type)
+            {
+                case DIRT:
+                {
+                    if (gid.y > 0 && data[idx - 1].type == EMPTY)
+                    {
+                        result[idx - 1] = { DIRT, 0 };
+                    }
+                    else
+                    {
+                        result[idx] = { DIRT, 0 };
+                    }
+                    break;
+                }
+                case STONE:
+                {
+                    unsigned dy = 1;
+                    while (dy <= data[idx].dy + 1 && gid.y >= dy &&
+                           data[idx - dy].type == EMPTY)
+                        ++dy;
+                    --dy;
+                    if (dy > 0)
+                    {
+                        result[idx - dy] = { STONE, dy };
+                    }
+                    else
+                    {
+                        result[idx] = { STONE, 0 };
+                    }
+                    break;
+                }
+            }
         }
     )", H);
 
@@ -110,7 +150,7 @@ set_up_processing ()
     }
 
     /* Prepare a metal pipeline */
-    NS::String* fnName = NS::String::string ("add_pairs", NS::UTF8StringEncoding);
+    NS::String* fnName = NS::String::string ("process_powder", NS::UTF8StringEncoding);
     MTL::Function* function = library->newFunction (fnName);
     // A 'compute' pipeline runs a single 'compute' function
     MTL::ComputePipelineState* pipeline = device->newComputePipelineState (function, &error);
@@ -125,17 +165,8 @@ set_up_processing ()
     const size_t inputBufferSize  = count * sizeof(Data);
     const size_t outputBufferSize = count * sizeof(Data);
 
-    std::vector<Data> pairs (count);
-    for (size_t y = 0; y < H; ++y)
-        for (size_t x = 0; x < W; ++x)
-        {
-            size_t i      = y * W + x;
-            pairs[i].type = EMPTY;
-            pairs[i].dy = 0;
-        }
-
-    bufPairs = device->newBuffer (pairs.data (), inputBufferSize,  MTL::ResourceStorageModeShared);
-    bufC     = device->newBuffer (outputBufferSize, MTL::ResourceStorageModeShared);
+    bufWorld = device->newBuffer (inputBufferSize,  MTL::ResourceStorageModeShared);
+    bufNewWorld = device->newBuffer (outputBufferSize, MTL::ResourceStorageModeShared);
 
     /* Calculate the maximum threads per threadgroup based on the thread execution width */
     NS::UInteger w            = pipeline->threadExecutionWidth ();
@@ -145,7 +176,4 @@ set_up_processing ()
 
     /* Create a command queue */
     queue = device->newCommandQueue ();
-
-     // run the GPU task immediately the 1st time
-    tLast = std::chrono::steady_clock::now () - std::chrono::seconds (1);
 }
