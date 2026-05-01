@@ -23,18 +23,6 @@ extern "C"
 #include <stdio.h>
 #include <stdlib.h>
 
-#if defined METAL
-#define NS_PRIVATE_IMPLEMENTATION
-#define MTL_PRIVATE_IMPLEMENTATION
-#include "metal-cpp/Metal/Metal.hpp"
-#endif
-
-#if defined METAL
-#define NS_PRIVATE_IMPLEMENTATION
-#define MTL_PRIVATE_IMPLEMENTATION
-#include "metal-cpp/Metal/Metal.hpp"
-#endif
-
 #include "PowderGame.h"
 
 size_t W = 1000;
@@ -123,86 +111,6 @@ main (int argc, char** argv)
   bool isDrawing = false;
 
   set_up_processing ();
-
-#if defined METAL
-  /* Find a GPU */
-    MTL::Device* device = MTL::CreateSystemDefaultDevice();
-    if (!device)
-    {
-        std::cerr << "Metal not supported" << std::endl;
-        return 1;
-    }
-
-    /* Metal function */
-    char shaderSrc[1024];
-    snprintf(shaderSrc, 1024, R"(
-        #include <metal_stdlib>
-        using namespace metal;
-
-        struct floatPair
-        {
-            float a;
-            float b;
-        };
-
-        kernel void add_pairs (
-            device const floatPair* pairs [[ buffer (0) ]],
-            device float* result          [[ buffer (1) ]],
-            uint2 gid                     [[ thread_position_in_grid ]]
-        ) {
-            uint index = gid.y * %i + gid.x;
-            result[index] = pairs[index].a + pairs[index].b;
-        }
-    )"), W);
-
-    /* Get a ref to the metal function */
-    NS::Error* error = nullptr;
-    NS::String* src = NS::String::string(shaderSrc, NS::UTF8StringEncoding);
-    MTL::CompileOptions* opts = MTL::CompileOptions::alloc ()->init ();
-    MTL::Library* library = device->newLibrary (src, opts, &error);
-    if (!library)
-    {
-        std::cerr << "Shader error: " << error->localizedDescription ()->utf8String () << std::endl;
-        return 1;
-    }
-
-    /* Prepare a metal pipeline */
-    NS::String* fnName = NS::String::string ("add_pairs", NS::UTF8StringEncoding);
-    MTL::Function* function = library->newFunction (fnName);
-    // A 'compute' pipeline runs a single 'compute' function
-    MTL::ComputePipelineState* pipeline = device->newComputePipelineState (function, &error);
-    if (!pipeline)
-    {
-        std::cerr << "Pipeline error: " << error->localizedDescription ()->utf8String () << std::endl;
-        return 1;
-    }
-
-    /* Create data buffers and load data into them */
-    const size_t count = W * H;
-    const size_t inputBufferSize  = count * sizeof(floatPair);
-    const size_t outputBufferSize = count * sizeof(float);
-
-    std::vector<floatPair> pairs (count);
-    for (size_t y = 0; y < H; ++y)
-        for (size_t x = 0; x < W; ++x)
-        {
-            size_t i      = y * W + x;
-            pairs[i].a  = float(i);
-            pairs[i].b  = float(i * 2);
-        }
-
-    MTL::Buffer* bufPairs = device->newBuffer (pairs.data (), inputBufferSize,  MTL::ResourceStorageModeShared);
-    MTL::Buffer* bufC     = device->newBuffer (outputBufferSize, MTL::ResourceStorageModeShared);
-
-    /* Calculate the maximum threads per threadgroup based on the thread execution width */
-    NS::UInteger w            = pipeline->threadExecutionWidth ();
-    NS::UInteger h            = pipeline->maxTotalThreadsPerThreadgroup () / w;
-    MTL::Size threadsPerGroup = MTL::Size (w, h, 1);
-    MTL::Size threadsPerGrid  = MTL::Size (W, H, 1);
-
-    /* Create a command queue */
-    MTL::CommandQueue* queue = device->newCommandQueue ();
-#endif
 
   int64_t compute_time_ms = 0;
   int64_t ui_time_ms = 0;
