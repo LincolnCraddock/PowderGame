@@ -8,43 +8,43 @@
 
 #include "PowderGame.h"
 
-std::vector<std::vector<Data>>
-process_powder (std::vector<std::vector<Data>>& world, unsigned H, unsigned W)
+std::vector<Data>
+process_powder (std::vector<Data>& world, unsigned H, unsigned W)
 {
-  std::vector<std::vector<Data>> newWorld (
-        H, std::vector<Data> (W, { EMPTY, 0 }));
+  std::vector<Data> newWorld (
+        H * W, { EMPTY, 0 });
   for (size_t y = 0; y < H; ++y)
   {
     for (size_t x = 0; x < W; ++x)
     {
-      switch (world[y][x].type)
+      switch (world[y + x * H].type)
       {
         case DIRT:
         {
-          if (y > 0 && world[y - 1][x].type == EMPTY)
+          if (y > 0 && world[y - 1 +x * H].type == EMPTY)
           {
-            newWorld[y - 1][x] = { DIRT, 0 };
+            newWorld[y - 1 + x * H] = { DIRT, 0 };
           }
           else
           {
-            newWorld[y][x] = { DIRT, 0 };
+            newWorld[y + x * H] = { DIRT, 0 };
           }
           break;
         }
         case STONE:
         {
           unsigned dy = 1;
-          while (dy <= world[y][x].dy + 1 && y >= dy &&
-                 world[y - dy][x].type == EMPTY)
+          while (dy <= world[y + x * H].dy + 1 && y >= dy &&
+                 world[y - dy + x * H].type == EMPTY)
             ++dy;
           --dy;
           if (dy > 0)
           {
-            newWorld[y - dy][x] = { STONE, dy };
+            newWorld[y - dy + x * H] = { STONE, dy };
           }
           else
           {
-            newWorld[y][x] = { STONE, 0 };
+            newWorld[y + x * H] = { STONE, 0 };
           }
           break;
         }
@@ -55,4 +55,5 @@ process_powder (std::vector<std::vector<Data>>& world, unsigned H, unsigned W)
       }
     }
   }
+  return newWorld;
 }

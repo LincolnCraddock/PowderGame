@@ -36,5 +36,5 @@ struct Data
   unsigned dy = 0;
 };
 
-extern std::vector<std::vector<Data>>
-process_powder (std::vector<std::vector<Data>>& world, unsigned H, unsigned W);
+extern std::vector<Data>
+process_powder (std::vector<Data>& world, unsigned H, unsigned W);

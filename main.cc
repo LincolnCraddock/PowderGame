@@ -34,7 +34,7 @@ extern "C"
 size_t W = 1000;
 size_t H = 1000;
 static float bg[3] = { 0, 0, 0 };
-static std::vector<std::vector<Data>> world;
+static std::vector<Data> world;
 static float tan_time_scale = 60.0f;
 
 // Sets the W and H global vars, which represent the width and height of the
@@ -97,7 +97,7 @@ main (int argc, char** argv)
 {
   setWH (argc, argv);
   world =
-    std::vector<std::vector<Data>> (H, std::vector<Data> (W, { EMPTY, 0 }));
+    std::vector<Data> (H * W, { EMPTY, 0 });
   r_init (W, H);
 
   /* init microui */
@@ -252,7 +252,7 @@ newWorld[index] = world[index];
         if (brush_size == 1)
         {
           if (py >= 0 && (size_t) py < H && px >= 0 && (size_t) px < W)
-            world[py][px] = { powder, 0 };
+            world[py + px * H] = { powder, 0 };
           return;
         }
         int x = 0, y = brush_size - 1, d = -brush_size;
@@ -261,7 +261,7 @@ newWorld[index] = world[index];
           if (row < 0 || (size_t) row >= H)
             return;
           for (int i = std::max (0, x0); i <= std::min ((int) W - 1, x1); i++)
-            world[row][i] = { powder, 0 };
+            world[row + i * H] = { powder, 0 };
         };
         fillRow (py, px - brush_size - 1, px + brush_size - 1);
         while (x < y)
@@ -412,9 +412,8 @@ newWorld[index] = world[index];
 
       /* Wait until the commands have finished */
       queue->signalEvent (frameCompletionEvent, frameIdx);
-#else
-      std::vector<std::vector<Data>> newWorld = process_powder (world, H, W);
 #endif
+      std::vector<Data> newWorld = process_powder (world, H, W);
       world = newWorld;
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
@@ -787,59 +786,6 @@ text_height (mu_Font font)
   (void) font;
   return r_get_text_height ();
 }
-
-#if defined METAL
-void
-process_powder ()
-{
-  std::vector<std::vector<Data>> newWorld (H,
-                                           std::vector<Data> (W, { EMPTY, 0 }));
-
-  for (size_t y = 0; y < H; ++y)
-  {
-    for (size_t x = 0; x < W; ++x)
-    {
-      switch (world[y][x].type)
-      {
-        case DIRT:
-        {
-          if (y > 0 && world[y - 1][x].type == EMPTY)
-          {
-            newWorld[y - 1][x] = { DIRT, 0 };
-          }
-          else
-          {
-            newWorld[y][x] = { DIRT, 0 };
-          }
-          break;
-        }
-        case STONE:
-        {
-          uint32_t dy = 1;
-          while (dy <= world[y][x].dy + 1 && y >= dy &&
-                 world[y - dy][x].type == EMPTY)
-            ++dy;
-          --dy;
-          if (dy > 0)
-          {
-            newWorld[y - dy][x] = { STONE, dy };
-          }
-          else
-          {
-            newWorld[y][x] = { STONE, 0 };
-          }
-          break;
-        }
-        default:
-        {
-          break;
-        }
-      }
-    }
-  }
-  world = newWorld;
-}
-#endif
 
 void
 render_powder ()
