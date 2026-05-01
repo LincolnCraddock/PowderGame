@@ -28,9 +28,9 @@ static MTL::Size threadsPerGrid;
 std::span<Data>
 process_powder ()
 {
-    Data* bufWorldPtr = (Data*)bufWorld->contents ();
+    Data* bufNewWorldPtr = (Data*)bufNewWorld->contents ();
     for (size_t i = 0; i < H * W; ++i)
-        bufWorldPtr[i] = {EMPTY, 0};
+        bufNewWorldPtr[i] = {EMPTY, 0};
 
     /* Create a command buffer and encoder */
     MTL::CommandBuffer* cmdBuf = queue->commandBuffer();
@@ -65,7 +65,10 @@ process_powder ()
     
     /* Return the results from the output buffer */
     // std::vector<Data> newWorld(bufNewWorldPtr, bufNewWorldPtr + H * W);
-    bufWorld = bufNewWorld;
+    MTL::Buffer* temp;
+    temp = bufNewWorld;
+    bufNewWorld = bufWorld;
+    bufWorld = temp;
     
     cmdBuf->release();
     
