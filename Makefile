@@ -5,8 +5,8 @@
 # ability to compile against harware-specific files for parallelization,
 # specifically, processCuda for Nvidia, processHip for AMD, 
 # and processMetal for Apple
-CFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c99 -ggdb
-CXXFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c++20 -ggdb
+CFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c99 -O3
+CXXFLAGS ?= -DNDEBUG -Wall -Wextra -pedantic -std=c++20 -O3
 LDLIBS = -lm
 SOURCES_C := renderer.c microui.c
 SOURCES_CXX := main.cc
