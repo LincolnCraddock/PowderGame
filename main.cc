@@ -274,7 +274,7 @@ main (int argc, char** argv)
 #if defined METAL
       
 #else
-      world = process_powder (world, H, W);
+      world = process_powder (world);
 #endif
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;

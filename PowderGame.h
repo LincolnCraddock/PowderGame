@@ -40,7 +40,7 @@ extern size_t W;
 extern size_t H;
 
 extern std::vector<Data>
-process_powder (std::vector<Data>& world, unsigned H, unsigned W);
+process_powder (std::vector<Data>& world);
 
 
 extern void
