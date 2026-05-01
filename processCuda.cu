@@ -32,13 +32,14 @@ process_powder(){
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
   ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), result.data().get(), H, W);
   cudaDeviceSynchronize ();
-  return std::span(result.data, H * W);
+  return std::span<Data>(result.data, H * W);
 }
 
-void
+std::span<Data>
 set_up_processing ()
 {
   world (H * W, {EMPTY, 0});
+  return std::span<Data> (world.data().get(), H * W);
 }
 
 __global__//

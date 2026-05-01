@@ -49,7 +49,7 @@ ifeq ($(GPU_TYPE),CUDA)
 		nvcc $(CUDAFLAGS) -c $< -o $@
 else ifeq ($(GPU_TYPE),HIP)
     $(info compiling for hip)
-    HIPFLAGS = --offload-arch=native -O3
+    HIPFLAGS = --offload-arch=native -O3 -std=c++20
     OBJECTS += hipgpu.o
     MAINCXX := hipcc
     ifeq ($(MAIN), main.exe)
