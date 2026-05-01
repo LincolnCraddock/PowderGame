@@ -22,13 +22,15 @@ extern "C"
 #include <ranges>
 #include <stdio.h>
 #include <stdlib.h>
+#include <span>
 
 #include "PowderGame.h"
 
 size_t W = 1000;
 size_t H = 1000;
 static float bg[3] = { 0, 0, 0 };
-static std::vector<Data> world;
+
+static std::span<Data> world;
 static float tan_time_scale = 60.0f;
 
 // Sets the W and H global vars, which represent the width and height of the
@@ -90,8 +92,7 @@ int
 main (int argc, char** argv)
 {
   setWH (argc, argv);
-  world =
-    std::vector<Data> (H * W, { EMPTY, 0 });
+  world = set_up_processing ();
   r_init (W, H);
 
   /* init microui */
@@ -109,8 +110,6 @@ main (int argc, char** argv)
   PowderType powder = DIRT;
   float time_scale = std::atan (tan_time_scale / 10.0f);
   bool isDrawing = false;
-
-  set_up_processing ();
 
   int64_t compute_time_ms = 0;
   int64_t ui_time_ms = 0;
@@ -271,7 +270,7 @@ main (int argc, char** argv)
     {
       time_of_last_compute = compute_before;
       /* compute a timestep in the powder simulation */
-      world = process_powder (world);
+      world = process_powder ();
       int64_t compute_after = r_get_time ();
       compute_time_ms = compute_after - compute_before;
       sleep_time_ms -= compute_time_ms;

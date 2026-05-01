@@ -9,6 +9,7 @@
 #include <vector>
 #include "microui.h"
 #include <string>
+#include <span>
 
 enum PowderType
 {
@@ -39,9 +40,9 @@ struct Data
 extern size_t W;
 extern size_t H;
 
-extern std::vector<Data>
-process_powder (std::vector<Data>& world);
+extern std::span<Data>
+process_powder ();
 
 
-extern void
+extern std::span<Data>
 set_up_processing ();

@@ -14,6 +14,7 @@
 #include "metal-cpp/Metal/Metal.hpp"
 
 #include <iostream>
+#include <span>
 
 // Make these global or static so they persist
 static MTL::Device* device = nullptr;
@@ -24,36 +25,25 @@ static MTL::Buffer* bufNewWorld = nullptr;
 static MTL::Size threadsPerGroup;
 static MTL::Size threadsPerGrid;
 
-// Forward declaration
-void set_up_processing();
-
-std::vector<Data>
-process_powder (std::vector<Data>& world)
-{    
-    Data* bufWorldPtr = (Data*)bufWorld->contents();
-    Data* bufNewWorldPtr = (Data*)bufNewWorld->contents();
-    
-    // Copy input data to GPU buffer
-    for (uint y = 0; y < H; ++y)
-        for (uint x = 0; x < W; ++x)
-        {
-            uint i = y * W + x;
-            bufWorldPtr[i] = world[i];
-            bufNewWorldPtr[i] = { EMPTY, 0 };
-        }
+std::span<Data>
+process_powder ()
+{
+    Data* bufWorldPtr = (Data*)bufWorld->contents ();
+    for (size_t i = 0; i < H * W; ++i)
+        bufWorldPtr[i] = {EMPTY, 0};
 
     /* Create a command buffer and encoder */
     MTL::CommandBuffer* cmdBuf = queue->commandBuffer();
     if (!cmdBuf) {
         std::cerr << "Failed to create command buffer" << std::endl;
-        return world;
+        return {};
     }
     
     MTL::ComputeCommandEncoder* encoder = cmdBuf->computeCommandEncoder();
     if (!encoder) {
         std::cerr << "Failed to create compute encoder" << std::endl;
         cmdBuf->release();
-        return world;
+        return {};
     }
 
     /* Write commands to the buffer via the encoder */
@@ -74,14 +64,15 @@ process_powder (std::vector<Data>& world)
     cmdBuf->waitUntilCompleted();
     
     /* Return the results from the output buffer */
-    std::vector<Data> newWorld(bufNewWorldPtr, bufNewWorldPtr + H * W);
+    // std::vector<Data> newWorld(bufNewWorldPtr, bufNewWorldPtr + H * W);
+    bufWorld = bufNewWorld;
     
     cmdBuf->release();
     
-    return newWorld;
+    return {(Data*)bufWorld->contents(), H * W};
 }
 
-void
+std::span<Data>
 set_up_processing ()
 {    
     /* Find a GPU */
@@ -89,7 +80,7 @@ set_up_processing ()
     if (!device)
     {
         std::cerr << "Metal not supported" << std::endl;
-        return;
+        return {};
     }
     
     /* Metal function */
@@ -162,7 +153,7 @@ set_up_processing ()
     MTL::CompileOptions* opts = MTL::CompileOptions::alloc()->init();
     if (!opts) {
         std::cerr << "Failed to create compile options" << std::endl;
-        return;
+        return {};
     }
     
     MTL::Library* library = device->newLibrary(src, opts, &error);
@@ -172,7 +163,7 @@ set_up_processing ()
     {
         std::cerr << "Shader error: " << (error ? error->localizedDescription()->utf8String() : "unknown") << std::endl;
         if (error) error->release();
-        return;
+        return {};
     }
     
     /* Prepare a metal pipeline */
@@ -183,7 +174,7 @@ set_up_processing ()
     if (!function) {
         std::cerr << "Failed to get function from library" << std::endl;
         library->release();
-        return;
+        return {};
     }
     
     // A 'compute' pipeline runs a single 'compute' function
@@ -195,7 +186,7 @@ set_up_processing ()
         std::cerr << "Pipeline error: " << (error ? error->localizedDescription()->utf8String() : "unknown") << std::endl;
         if (error) error->release();
         library->release();
-        return;
+        return {};
     }
     library->release();
 
@@ -208,7 +199,7 @@ set_up_processing ()
     
     if (!bufWorld || !bufNewWorld) {
         std::cerr << "Failed to create buffers" << std::endl;
-        return;
+        return {};
     }
     
     /* Calculate the maximum threads per threadgroup based on the thread execution width */
@@ -222,6 +213,8 @@ set_up_processing ()
     queue = device->newCommandQueue();
     if (!queue) {
         std::cerr << "Failed to create command queue" << std::endl;
-        return;
+        return {};
     }
+
+    return { (Data*)bufWorld->contents(), H * W };
 }

@@ -8,8 +8,10 @@
 
 #include "PowderGame.h"
 
-std::vector<Data>
-process_powder (std::vector<Data>& world)
+static std::vector<Data> myWorld;
+
+std::span<Data>
+process_powder ()
 {
   std::vector<Data> newWorld (
         H * W, { EMPTY, 0 });
@@ -17,11 +19,11 @@ process_powder (std::vector<Data>& world)
   {
     for (size_t y = 0; y < H; ++y)
     {
-      switch (world[y + x * H].type)
+      switch (myWorld[y + x * H].type)
       {
         case DIRT:
         {
-          if (y > 0 && world[y - 1 + x * H].type == EMPTY)
+          if (y > 0 && myWorld[y - 1 + x * H].type == EMPTY)
           {
             newWorld[y - 1 + x * H] = { DIRT, 0 };
           }
@@ -34,8 +36,8 @@ process_powder (std::vector<Data>& world)
         case STONE:
         {
           unsigned dy = 1;
-          while (dy <= world[y + x * H].dy + 1 && y >= dy &&
-                 world[y - dy + x * H].type == EMPTY)
+          while (dy <= myWorld[y + x * H].dy + 1 && y >= dy &&
+                 myWorld[y - dy + x * H].type == EMPTY)
             ++dy;
           --dy;
           if (dy > 0)
@@ -55,11 +57,13 @@ process_powder (std::vector<Data>& world)
       }
     }
   }
-  return newWorld;
+  myWorld = newWorld;
+  return myWorld;
 }
 
-void
+std::span<Data>
 set_up_processing ()
 {
-  // nothing to set up
+  myWorld = std::vector<Data> (H * W, { EMPTY, 0 });
+  return myWorld;
 }
