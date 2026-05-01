@@ -19,13 +19,15 @@ const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
 namespace cg = cooperative_groups;
 
+thrust::universal_vector<Data> world;
+
 __global__//
 void
 ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w);
 
 //pass in the input and output grids, and cast to universal_vector implicitly
 std::span<Data>
-process_powder(thrust::universal_vector<Data> vec)
+process_powder()
 {
   //int *result_ptr, result;
   /* Allocate memory for the device to write the result to. */
@@ -36,10 +38,10 @@ process_powder(thrust::universal_vector<Data> vec)
     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
   //ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (vec.data().get(), result.data().get(), H, W);
 
-  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(vec.data().get(), result.data().get(), H, W);
+  ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(world.data().get(), result.data().get(), H, W);
   
   hipDeviceSynchronize ();
-  return std::vector(result.begin(),result.end());
+  return std::span<Data> (result.data().get(), H * W);
   /* Copy result from device to host. This acts as a
      synchronization point, waiting for the kernel dispatch to
      complete. */
@@ -51,12 +53,11 @@ process_powder(thrust::universal_vector<Data> vec)
   // return 0;
 }
 
-//wrap the function call
-std::vector<Data>
-process_powder (std::vector<Data>& world)
-{ 
-  std::vector<Data> newWorld (H * W, { EMPTY, 0 });
-  return ProcessPowderHip(world,newWorld);
+std::span<Data>
+set_up_processing ()
+{
+  world  = thrust::universal_vector<Data>(H * W, {EMPTY, 0});
+  return std::span<Data> (world.data().get(), H * W);
 }
 
 __global__//
@@ -96,9 +97,4 @@ ProcessPowderHipGPU (Data* const input, Data* result, unsigned h, unsigned w)
         break;
     }
   }
-}
-void
-set_up_processing ()
-{
-  // nothing to set up
 }
