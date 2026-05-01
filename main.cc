@@ -122,6 +122,8 @@ main (int argc, char** argv)
   float time_scale = std::atan (tan_time_scale / 10.0f);
   bool isDrawing = false;
 
+  set_up_processing ();
+
 #if defined METAL
   /* Find a GPU */
     MTL::Device* device = MTL::CreateSystemDefaultDevice();

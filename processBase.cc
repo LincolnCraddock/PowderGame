@@ -57,3 +57,9 @@ process_powder (std::vector<Data>& world, unsigned H, unsigned W)
   }
   return newWorld;
 }
+
+extern void
+set_up_processing ()
+{
+  // nothing to set up
+}

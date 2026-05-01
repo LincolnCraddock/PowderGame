@@ -38,3 +38,7 @@ struct Data
 
 extern std::vector<Data>
 process_powder (std::vector<Data>& world, unsigned H, unsigned W);
+
+
+extern void
+set_up_processing ();
