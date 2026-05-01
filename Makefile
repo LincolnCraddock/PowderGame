@@ -89,7 +89,7 @@ $(MAIN): $(OBJECTS)
 
 .PHONY: clean cuda hip metal
 clean:
-	rm -f $(MAIN) $(OBJECTS) $(DEPS) *.o
+	rm -f $(MAIN) $(OBJECTS) $(DEPS) *.o *.d
 
 cuda:
 	make GPU_TYPE=CUDA
