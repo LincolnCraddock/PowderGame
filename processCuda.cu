@@ -17,29 +17,56 @@ const unsigned THREADS_PER_BLOCK = 256;
 const unsigned THREADS_PER_WARP = 32;
 //const unsigned WARPS_PER_BLOCK = 8;
 namespace cg = cooperative_groups;
-thrust::universal_vector<Data> world;
+static thrust::universal_vector<Data> world1;
+static thrust::universal_vector<Data> world2;
+bool toggle = true;
 
 __global__//
 void
-ProcessPowderCudaGPU (Data* const a, Data* result, unsigned h, unsigned w);
+ProcessPowderCudaGPU (Data* const input, Data* result, unsigned h, unsigned w);
 
 //pass in the input and output grids, and cast to universal_vector implicitly
 std::span<Data>
 process_powder(){
-  
-  thrust::universal_vector<Data> result (H * W, { EMPTY, 0 });
+  if (toggle)
+  {
+    for (size_t i = 0; i < H*W; ++i)
+      world2[i] = {EMPTY, 0};
+    const unsigned NUM_BLOCKS =
+      (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world1.data().get(), world2.data().get(), H, W);
+    cudaDeviceSynchronize ();
+    toggle = !toggle;
+    return std::span<Data>(world2.data().get(), H * W);
+  }
+  else
+  {
+    for (size_t i = 0; i < H*W; ++i)
+      world1[i] = {EMPTY, 0};
+    const unsigned NUM_BLOCKS =
+      (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+    ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world2.data().get(), world1.data().get(), H, W);
+    cudaDeviceSynchronize ();
+    toggle = !toggle;
+    std::cout << "cuda returned" << std::endl;
+    return std::span<Data>(world1.data().get(), H * W);
+  }
+  thrust::universal_vector<Data> newWorld (H * W, {EMPTY, 0});
   const unsigned NUM_BLOCKS =
-    (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), result.data().get(), H, W);
+      (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), newWorld.data().get(), H, W);
   cudaDeviceSynchronize ();
-  return std::span<Data>(result.data, H * W);
+  world = newWorld;
+  return std::span<Data>(newWorld.data().get(), H * W);
+
 }
 
 std::span<Data>
 set_up_processing ()
 {
-  world (H * W, {EMPTY, 0});
-  return std::span<Data> (world.data().get(), H * W);
+  world1 = thrust::universal_vector<Data> (H * W, {EMPTY, 0});
+  world2 = thrust::universal_vector<Data> (H * W, {EMPTY, 0});
+  return std::span<Data> (world1.data().get(), H * W);
 }
 
 __global__//
