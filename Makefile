@@ -50,6 +50,7 @@ ifeq ($(GPU_TYPE),CUDA)
 else ifeq ($(GPU_TYPE),HIP)
     $(info compiling for hip)
     HIPFLAGS = --offload-arch=native -O3 -std=c++20
+    #LDLIBS += -DLIBM_LIBRARY=LIBM-NOTFOUND
     OBJECTS += hipgpu.o
     MAINCXX := hipcc
     ifeq ($(MAIN), main.exe)
