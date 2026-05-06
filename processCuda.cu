@@ -51,13 +51,13 @@ process_powder(){
     std::cout << "cuda returned" << std::endl;
     return std::span<Data>(world1.data().get(), H * W);
   }
-  thrust::universal_vector<Data> newWorld (H * W, {EMPTY, 0});
-  const unsigned NUM_BLOCKS =
-      (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-  ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), newWorld.data().get(), H, W);
-  cudaDeviceSynchronize ();
-  world = newWorld;
-  return std::span<Data>(newWorld.data().get(), H * W);
+  // thrust::universal_vector<Data> newWorld (H * W, {EMPTY, 0});
+  // const unsigned NUM_BLOCKS =
+  //     (H * W + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+  // ProcessPowderCudaGPU<<<NUM_BLOCKS, THREADS_PER_BLOCK>>> (world.data().get(), newWorld.data().get(), H, W);
+  // cudaDeviceSynchronize ();
+  // world = newWorld;
+  // return std::span<Data>(newWorld.data().get(), H * W);
 
 }
 
