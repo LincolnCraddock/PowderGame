@@ -40,7 +40,7 @@ process_powder()
 
   ProcessPowderHipGPU<<<dim3(NUM_BLOCKS), dim3(THREADS_PER_BLOCK), 0, 0>>>(world.data().get(), result.data().get(), H, W);
   
-  hipDeviceSynchronize ();
+  auto temp = hipDeviceSynchronize ();
   return std::span<Data> (result.data().get(), H * W);
   /* Copy result from device to host. This acts as a
      synchronization point, waiting for the kernel dispatch to
